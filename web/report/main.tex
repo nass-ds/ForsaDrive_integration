@@ -1,0 +1,2202 @@
+%=============================================================================
+%  ForsaDrive — Final Year Project Report (PFE)
+%  Academic Year 2024–2025
+%  Compile with: pdflatex → biber → pdflatex → pdflatex
+%=============================================================================
+\documentclass[12pt,a4paper,openright]{report}
+
+%─────────────────────────────────────────────────────────────────────────────
+% PACKAGES
+%─────────────────────────────────────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{lmodern}
+\usepackage[top=2.5cm, bottom=2.5cm, left=3cm, right=2.5cm]{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{hyperref}
+\usepackage[acronym,toc]{glossaries}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{pifont}
+\usepackage[style=ieee, backend=biber]{biblatex}
+\addbibresource{references.bib}
+\usepackage{emptypage}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+\usepackage{mdframed}
+\usepackage{tcolorbox}
+\tcbuselibrary{most}
+
+%─────────────────────────────────────────────────────────────────────────────
+% COLOURS
+%─────────────────────────────────────────────────────────────────────────────
+\definecolor{fdnavy}{RGB}{10, 37, 64}
+\definecolor{fdaccent}{RGB}{245, 158, 11}
+\definecolor{fdgray}{RGB}{100, 116, 139}
+\definecolor{codegreen}{rgb}{0,0.5,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codebg}{rgb}{0.97,0.97,0.97}
+
+%─────────────────────────────────────────────────────────────────────────────
+% CODE LISTINGS
+%─────────────────────────────────────────────────────────────────────────────
+\lstdefinestyle{phpstyle}{
+    backgroundcolor=\color{codebg},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{fdnavy}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{fdaccent},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single,
+    rulecolor=\color{fdgray!40},
+    language=PHP
+}
+\lstdefinestyle{dartstyle}{
+    backgroundcolor=\color{codebg},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{fdnavy}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{fdaccent},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    captionpos=b,
+    numbers=left,
+    numbersep=5pt,
+    frame=single,
+    rulecolor=\color{fdgray!40},
+    language=Java  % Dart not built in; Java is close enough for coloring
+}
+\lstdefinestyle{sqlstyle}{
+    backgroundcolor=\color{codebg},
+    keywordstyle=\color{fdnavy}\bfseries,
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    numbers=left,
+    frame=single,
+    language=SQL
+}
+
+%─────────────────────────────────────────────────────────────────────────────
+% HYPERREF CONFIG
+%─────────────────────────────────────────────────────────────────────────────
+\hypersetup{
+    colorlinks=true,
+    linkcolor=fdnavy,
+    citecolor=fdnavy,
+    urlcolor=fdaccent,
+    pdftitle={ForsaDrive — PFE Report},
+    pdfauthor={Youssef Ben Abid \& Anas Younes},
+    pdfsubject={Final Year Engineering Project},
+    pdfkeywords={carpooling, ride-sharing, Tunisia, PHP, Flutter, web, mobile}
+}
+
+%─────────────────────────────────────────────────────────────────────────────
+% HEADERS & FOOTERS
+%─────────────────────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\small\nouppercase{\leftmark}}
+\fancyhead[RE,LO]{\small ForsaDrive}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+%─────────────────────────────────────────────────────────────────────────────
+% CHAPTER TITLE FORMATTING
+%─────────────────────────────────────────────────────────────────────────────
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{fdnavy}}
+  {\chaptertitlename\ \thechapter}
+  {20pt}
+  {\Huge}
+\titlespacing*{\chapter}{0pt}{-20pt}{40pt}
+
+%─────────────────────────────────────────────────────────────────────────────
+% BOX FOR USE CASE DESCRIPTIONS
+%─────────────────────────────────────────────────────────────────────────────
+\newenvironment{ucbox}[1]{%
+  \begin{tcolorbox}[title=#1, colback=fdnavy!3, colframe=fdnavy,
+    fonttitle=\bfseries, breakable]%
+}{%
+  \end{tcolorbox}%
+}
+
+%─────────────────────────────────────────────────────────────────────────────
+% GLOSSARY / ACRONYMS
+%─────────────────────────────────────────────────────────────────────────────
+\makeglossaries
+\newacronym{api}{API}{Application Programming Interface}
+\newacronym{crud}{CRUD}{Create, Read, Update, Delete}
+\newacronym{csrf}{CSRF}{Cross-Site Request Forgery}
+\newacronym{er}{ER}{Entity-Relationship}
+\newacronym{gps}{GPS}{Global Positioning System}
+\newacronym{html}{HTML}{HyperText Markup Language}
+\newacronym{http}{HTTP}{HyperText Transfer Protocol}
+\newacronym{https}{HTTPS}{HTTP Secure}
+\newacronym{ide}{IDE}{Integrated Development Environment}
+\newacronym{json}{JSON}{JavaScript Object Notation}
+\newacronym{jwt}{JWT}{JSON Web Token}
+\newacronym{mvc}{MVC}{Model–View–Controller}
+\newacronym{oop}{OOP}{Object-Oriented Programming}
+\newacronym{orm}{ORM}{Object-Relational Mapping}
+\newacronym{pdo}{PDO}{PHP Data Objects}
+\newacronym{pfe}{PFE}{Projet de Fin d'Études (Final Year Project)}
+\newacronym{php}{PHP}{PHP: Hypertext Preprocessor}
+\newacronym{rest}{REST}{Representational State Transfer}
+\newacronym{sdk}{SDK}{Software Development Kit}
+\newacronym{sql}{SQL}{Structured Query Language}
+\newacronym{sqlite}{SQLite}{Self-Contained, Serverless SQL Database}
+\newacronym{tls}{TLS}{Transport Layer Security}
+\newacronym{ui}{UI}{User Interface}
+\newacronym{ux}{UX}{User Experience}
+\newacronym{uml}{UML}{Unified Modeling Language}
+\newacronym{url}{URL}{Uniform Resource Locator}
+\newacronym{xss}{XSS}{Cross-Site Scripting}
+\newacronym{owasp}{OWASP}{Open Web Application Security Project}
+\newacronym{tnd}{TND}{Tunisian Dinar}
+
+%=============================================================================
+\begin{document}
+\onehalfspacing
+
+%─────────────────────────────────────────────────────────────────────────────
+%  COVER PAGE
+%─────────────────────────────────────────────────────────────────────────────
+\begin{titlepage}
+\begin{center}
+
+% Top logos — replace with actual image files
+\begin{minipage}{0.45\textwidth}
+\centering
+% \includegraphics[width=3.5cm]{logos/ministry_logo.png}\\[0.2cm]
+\textbf{\small République Tunisienne}\\
+\textbf{\small Ministère de l'Enseignement Supérieur}\\
+\textbf{\small et de la Recherche Scientifique}
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\textwidth}
+\centering
+% \includegraphics[width=3.5cm]{logos/university_logo.png}\\[0.2cm]
+\textbf{\small [YOUR UNIVERSITY NAME]}\\
+\textbf{\small [YOUR FACULTY / SCHOOL NAME]}
+\end{minipage}
+
+\vspace{0.5cm}
+\noindent\rule{\textwidth}{1.5pt}
+\vspace{0.3cm}
+
+{\large \textbf{[DEPARTMENT / SPECIALIZATION NAME]}}\\[0.3cm]
+{\large \textbf{Final Year Engineering Project (PFE)}}\\[0.2cm]
+{\normalsize Academic Year 2024–2025}
+
+\vspace{0.8cm}
+
+% Title box
+\begin{tcolorbox}[colback=fdnavy, colframe=fdnavy, boxrule=0pt,
+    left=1cm, right=1cm, top=0.6cm, bottom=0.6cm]
+\centering
+{\Huge\bfseries\color{white} ForsaDrive}\\[0.4cm]
+{\Large\color{fdaccent} An Integrated Ride-Sharing Platform}\\[0.2cm]
+{\large\color{white!80!gray} Web Application \& Mobile Application}\\[0.2cm]
+{\normalsize\color{white!70!gray} Designed for the Tunisian Market}
+\end{tcolorbox}
+
+\vspace{0.8cm}
+
+% Project logo placeholder
+\begin{center}
+% \includegraphics[width=4cm]{logos/forsadrive_logo.png}
+\textit{[Insert ForsaDrive Logo Here]}
+\end{center}
+
+\vspace{0.6cm}
+
+\begin{minipage}{0.48\textwidth}
+\centering
+{\large \textbf{Realised by:}}\\[0.2cm]
+{\large Youssef \textsc{Ben Abid}}\\[0.1cm]
+{\large Anas \textsc{Younes}}
+\end{minipage}
+\hfill
+\begin{minipage}{0.48\textwidth}
+\centering
+{\large \textbf{Supervised by:}}\\[0.2cm]
+{\large [SUPERVISOR TITLE \& NAME]}\\[0.1cm]
+{\small [Academic Title / Department]}
+\end{minipage}
+
+\vspace{0.6cm}
+\noindent\rule{\textwidth}{0.8pt}
+\vspace{0.3cm}
+
+{\normalsize Presented and defended on: \textbf{[DATE OF DEFENCE]}}\\[0.2cm]
+{\normalsize Before the examination jury composed of:}
+
+\vspace{0.3cm}
+\begin{tabular}{lll}
+\toprule
+\textbf{Name} & \textbf{Institution} & \textbf{Role} \\
+\midrule
+[JURY PRESIDENT NAME] & [Institution] & President \\
+[EXAMINER 1 NAME]     & [Institution] & Examiner \\
+[SUPERVISOR NAME]     & [Institution] & Supervisor \\
+\bottomrule
+\end{tabular}
+
+\end{center}
+\end{titlepage}
+
+%─────────────────────────────────────────────────────────────────────────────
+%  DEDICATION
+%─────────────────────────────────────────────────────────────────────────────
+\cleardoublepage
+\thispagestyle{empty}
+\vspace*{5cm}
+\begin{flushright}
+\itshape\large
+To our families, whose unwavering support and sacrifices\\
+made every step of this journey possible.\\[0.5cm]
+To our professors and mentors,\\
+who guided us with patience and wisdom.\\[0.5cm]
+To everyone who believes that technology\\
+can make everyday life a little easier.\\[1cm]
+--- Youssef \& Anas
+\end{flushright}
+
+%─────────────────────────────────────────────────────────────────────────────
+%  ACKNOWLEDGEMENTS
+%─────────────────────────────────────────────────────────────────────────────
+\cleardoublepage
+\chapter*{Acknowledgements}
+\addcontentsline{toc}{chapter}{Acknowledgements}
+\thispagestyle{fancy}
+
+We would like to express our deepest gratitude to all those who contributed, directly or indirectly, to the realisation of this project.
+
+First and foremost, we extend our sincere thanks to our supervisor, \textbf{[SUPERVISOR NAME]}, for their continuous guidance, constructive feedback, and availability throughout the duration of this project. Their technical expertise and pedagogical patience were invaluable in shaping both the depth and quality of this work.
+
+We are grateful to the faculty and teaching staff of \textbf{[YOUR INSTITUTION NAME]} for the rigorous academic training they have provided over the years, which gave us the foundations necessary to undertake a project of this scope.
+
+We would also like to thank the members of the examination jury for dedicating their time to evaluating this work and for the enriching discussions that will follow.
+
+Our gratitude extends to our fellow students and peers for the collaborative spirit and the countless technical discussions that helped refine our ideas and resolve many challenges.
+
+Finally, we owe a special debt of gratitude to our families. Their unconditional support, patience, and encouragement throughout our studies have been our greatest source of motivation.
+
+This project would not exist without all of you. Thank you.
+
+\vspace{1cm}
+\begin{flushright}
+\textit{Youssef Ben Abid \& Anas Younes}\\
+\textit{[City], [Month] 2025}
+\end{flushright}
+
+%─────────────────────────────────────────────────────────────────────────────
+%  ABSTRACT
+%─────────────────────────────────────────────────────────────────────────────
+\cleardoublepage
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+\thispagestyle{fancy}
+
+\noindent\textbf{Title:} ForsaDrive --- An Integrated Ride-Sharing Platform for the Tunisian Market
+
+\vspace{0.4cm}
+
+Urban mobility in Tunisia remains constrained by insufficient public transport, high private vehicle costs, and a lack of structured, technology-mediated carpooling. ForsaDrive addresses this gap by providing an integrated ride-sharing platform designed specifically for Tunisian users and operating conditions.
+
+This project presents the design, implementation, and evaluation of ForsaDrive as a dual-platform system: a responsive web application built with PHP, SQLite, and Bootstrap 5, and a native mobile application developed with the Flutter framework. The two platforms share a common backend architecture, exposing a \gls{rest}ful \gls{api} that enables consistent data access and business logic enforcement across both clients.
+
+The system implements a comprehensive set of features including user registration with identity verification, driver onboarding with vehicle documentation, real-time ride searching and booking, an in-app wallet with a simulated payment flow and referral incentive programme, peer-to-peer messaging, a rating and complaint system, a dedicated helpdesk module, and a web-based administrative control panel.
+
+Throughout development, particular emphasis was placed on security (session-based authentication, CAPTCHA verification, input sanitisation, \gls{xss} and \gls{csrf} protection), usability (mobile-first responsive design, multi-step registration, client-side face detection for profile photographs), and system extensibility to support future integration with real Tunisian payment gateways.
+
+The project was developed following an Agile-Scrum methodology over four iterative sprints, and was validated through systematic functional testing against the defined requirements.
+
+\vspace{0.5cm}
+\noindent\textbf{Keywords:} ride-sharing, carpooling, Tunisia, web application, mobile application, PHP, SQLite, Flutter, REST API, Agile, urban mobility.
+
+\vspace{1cm}
+
+%── French abstract (Résumé) ─────────────────────────────────────────────────
+\noindent\rule{\textwidth}{0.4pt}
+\vspace{0.3cm}
+\noindent\textbf{Titre:} ForsaDrive --- Une Plateforme de Covoiturage Intégrée pour le Marché Tunisien
+
+\vspace{0.3cm}
+\noindent\textit{La mobilité urbaine en Tunisie est entravée par l'insuffisance des transports publics et l'absence de solutions de covoiturage structurées et numérisées. ForsaDrive répond à cette problématique en proposant une plateforme de covoiturage intégrée, déclinée en application web (PHP, SQLite, Bootstrap\,5) et en application mobile native (Flutter), partageant un backend \gls{rest}ful commun. Le système couvre l'intégralité du cycle de vie d'un trajet partagé, de la publication à l'évaluation, tout en intégrant un portefeuille électronique, un système de parrainage, une messagerie intégrée et un tableau de bord d'administration. Le projet a été réalisé selon une méthodologie Agile-Scrum et validé par des tests fonctionnels systématiques.}
+
+\vspace{0.4cm}
+\noindent\textbf{Mots-clés:} covoiturage, Tunisie, application web, application mobile, PHP, Flutter, API REST, Agile.
+
+%─────────────────────────────────────────────────────────────────────────────
+%  TABLE OF CONTENTS
+%─────────────────────────────────────────────────────────────────────────────
+\cleardoublepage
+\tableofcontents
+
+%─────────────────────────────────────────────────────────────────────────────
+%  LIST OF FIGURES
+%─────────────────────────────────────────────────────────────────────────────
+\cleardoublepage
+\listoffigures
+\addcontentsline{toc}{chapter}{List of Figures}
+
+%─────────────────────────────────────────────────────────────────────────────
+%  LIST OF TABLES
+%─────────────────────────────────────────────────────────────────────────────
+\cleardoublepage
+\listoftables
+\addcontentsline{toc}{chapter}{List of Tables}
+
+%─────────────────────────────────────────────────────────────────────────────
+%  LIST OF ACRONYMS
+%─────────────────────────────────────────────────────────────────────────────
+\cleardoublepage
+\printglossary[type=\acronymtype, title=List of Acronyms, toctitle=List of Acronyms]
+
+\cleardoublepage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+%=============================================================================
+%  CHAPTER 1 — GENERAL INTRODUCTION
+%=============================================================================
+\chapter{General Introduction}
+
+\section*{Chapter Introduction}
+This chapter provides a broad overview of the motivations and context behind the ForsaDrive project. It identifies the problem being addressed, explains the rationale for the chosen approach, defines the project objectives, and outlines the structure of the remainder of this report.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Project Background}
+
+Transportation is one of the most fundamental challenges facing modern urban societies. In Tunisia, this challenge is particularly acute. Despite significant urbanisation over the past two decades, the country's public transportation infrastructure has struggled to keep pace with growing demand \cite{worldbank_transport}. Major cities such as Tunis, Sfax, and Sousse face chronic congestion, while secondary cities and rural areas remain significantly underserved by formal transit networks. Private vehicle ownership, while rising, remains financially inaccessible to a large proportion of the population due to acquisition costs, fuel prices, and insurance expenses.
+
+Carpooling --- the practice of sharing a private vehicle journey between a driver and one or more passengers travelling in the same direction --- has long been practised informally in Tunisia. However, these arrangements are typically organised through word-of-mouth, social media groups, or informal platforms that offer no guarantees of safety, pricing transparency, or accountability. The absence of a dedicated, technology-mediated carpooling platform tailored to the Tunisian market creates a significant unmet need.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Problem Context}
+
+The ride-sharing market in North Africa has seen the entry of international platforms such as InDriver and regional operators such as Yassir. However, these services are predominantly taxi-hailing or private hire vehicle applications rather than true peer-to-peer carpooling platforms. They are optimised for urban on-demand transport and do not cater well to inter-city shared journeys, student commutes between campuses and home cities, or the needs of organisations seeking to reduce their employees' transport expenses.
+
+Furthermore, international platforms do not address several Tunisia-specific constraints:
+\begin{itemize}[noitemsep]
+    \item Payment infrastructure: the absence of widespread credit card usage and the limited reach of international payment gateways requires integration with local payment solutions such as Flouci or Konnect.
+    \item Identity verification: the Tunisian national identity card (\textit{CIN}) and vehicle registration document (\textit{carte grise}) are the primary identification documents, and a compliant carpooling platform must incorporate their verification.
+    \item Language and localisation: a platform serving Tunisia must accommodate French and Arabic interfaces alongside English.
+    \item Geographic specificity: Tunisian governorate and municipality structures must be natively supported for origin and destination selection.
+\end{itemize}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Project Motivation}
+
+The ForsaDrive project was motivated by a convergence of social, economic, and technical considerations. From a social standpoint, carpooling has the potential to reduce per-capita vehicle emissions, decongest urban road networks, and strengthen social connectivity by enabling riders and drivers to share journeys and costs. From an economic standpoint, carpooling allows drivers to offset vehicle operating costs and provides passengers with a significantly cheaper alternative to taxis. Tunisian students, in particular, stand to benefit enormously from affordable inter-city transport.
+
+From a technical standpoint, the project presented an opportunity to design and implement a full-stack, production-quality platform that integrates web and mobile clients against a shared backend --- a scope that exercises the full breadth of software engineering competencies acquired over the course of our studies.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Project Objectives}
+
+The primary objective of this project is to design, implement, and validate ForsaDrive as a complete, dual-platform ride-sharing system. Specifically, the project aims to:
+
+\begin{enumerate}[noitemsep]
+    \item Provide a web application that allows Tunisian users to register as passengers or drivers, publish and search for shared rides, book journeys, communicate with each other, and manage their accounts.
+    \item Provide a companion mobile application (Android/iOS) built with Flutter, targeting the same core ride-sharing workflows in a native mobile experience.
+    \item Implement a shared, stateless \gls{rest}ful \gls{api} backend that both platforms consume, ensuring data consistency and facilitating future extensibility.
+    \item Incorporate mechanisms for driver verification, including vehicle registration document upload and, for profile photos, client-side face detection.
+    \item Implement a simulated in-app wallet supporting future integration with Tunisian payment gateways, alongside a referral-based incentive programme.
+    \item Support organisational (corporate) accounts with configurable passenger discount tiers.
+    \item Enforce robust security practices including authenticated sessions, CAPTCHA verification, input validation, and protection against common web vulnerabilities.
+    \item Deliver a system that is maintainable, documented, and designed for eventual production deployment.
+\end{enumerate}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Report Structure}
+
+The remainder of this report is organised as follows:
+
+\begin{description}[noitemsep, font=\normalfont\bfseries]
+    \item[Chapter 2] establishes the project context, describes the host organisation, analyses the problem domain in depth, states the project objectives formally, and presents the development methodology adopted.
+    \item[Chapter 3] surveys existing ride-sharing and carpooling solutions, critically analyses their limitations, identifies system stakeholders, and elicits both functional and non-functional requirements.
+    \item[Chapter 4] presents the system analysis and specification: business processes, \gls{uml} use case diagrams with detailed descriptions, business rules, and the conceptual data model.
+    \item[Chapter 5] describes the system design: technology stack selection and justification, overall architecture, database schema, web application design, mobile application design, security design, and UI/UX decisions.
+    \item[Chapter 6] documents the implementation: development environment setup, project structure, key implementation choices for the backend, web application, and mobile application, and technical challenges encountered.
+    \item[Chapter 7] covers testing, validation, and deployment: testing strategy, functional test results, security and performance considerations, and the deployment process.
+    \item[Chapter 8] concludes the report with a summary of achievements, contributions, identified limitations, and directions for future work.
+\end{description}
+
+\section*{Chapter Conclusion}
+
+This introductory chapter has established the social and technical context that motivates ForsaDrive. Tunisia's urban mobility challenges, combined with the absence of a dedicated, locally adapted carpooling platform, define a clear problem space. ForsaDrive's dual-platform approach --- a full-featured web application complemented by a native mobile application --- represents a response to this gap. The following chapter will examine the project context and problem statement in greater detail.
+
+%=============================================================================
+%  CHAPTER 2 — PROJECT CONTEXT AND PROBLEM STATEMENT
+%=============================================================================
+\chapter{Project Context and Problem Statement}
+
+\section*{Chapter Introduction}
+This chapter situates ForsaDrive within its organisational and academic context, provides a deeper analysis of the problem domain, formally states the project objectives, and describes the software development methodology that was adopted.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Host Organisation and Project Environment}
+
+ForsaDrive was developed as a \gls{pfe} project within the framework of \textbf{[YOUR INSTITUTION NAME]}, specifically the \textbf{[DEPARTMENT / SPECIALIZATION NAME]} programme. The project was supervised by \textbf{[SUPERVISOR NAME]}, whose role encompassed technical guidance, scope validation, and periodic progress reviews.
+
+The project was realised entirely by two students, \textbf{Youssef Ben Abid} and \textbf{Anas Younes}, working in close collaboration. Task allocation was structured as follows:
+
+\begin{table}[H]
+\centering
+\caption{Developer Responsibility Allocation}
+\label{tab:dev-allocation}
+\begin{tabularx}{\textwidth}{l X X}
+\toprule
+\textbf{Module / Feature} & \textbf{Youssef Ben Abid} & \textbf{Anas Younes} \\
+\midrule
+System Architecture \& DB Design & Primary & Reviewer \\
+Authentication \& Security & Primary & Support \\
+Ride Management (web) & Primary & Support \\
+Booking \& Payments (web) & Primary & Support \\
+Admin Panel (web) & Primary & Support \\
+Mobile App Architecture & Reviewer & Primary \\
+Mobile App — Passenger flow & Support & Primary \\
+Mobile App — Driver flow & Support & Primary \\
+UI/UX Design & Joint & Joint \\
+Testing \& Documentation & Joint & Joint \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Domain Context: Ride-Sharing and Urban Mobility}
+
+\subsection{Global Context}
+
+Ride-sharing and carpooling have emerged globally as significant components of the ``sharing economy'' \cite{botsman2010}. Platforms such as BlaBlaCar in Europe and Lyft in North America have demonstrated that peer-to-peer ride-sharing can achieve mass adoption when supported by trustworthy reputation systems, transparent pricing, and convenient digital interfaces. The market has bifurcated into two distinct segments: \textit{ride-hailing} (on-demand taxi replacement, e.g. Uber, Bolt) and \textit{carpooling} (planned shared journeys between users going the same direction, e.g. BlaBlaCar). ForsaDrive operates primarily in the carpooling segment.
+
+\subsection{Tunisian Context}
+
+According to data from the Tunisian National Institute of Statistics, road transport accounts for approximately 94\% of passenger mobility in Tunisia \cite{ins_transport}. The national railway network (SNCFT) serves a limited number of routes, and inter-city bus services (SNTRI) are often overcrowded and delayed. Tunis itself has a metro (métro léger) network, but it does not extend to suburbs or neighbouring governorates.
+
+Student mobility presents a particularly strong use case. Tunisia has over 200,000 students enrolled in higher education institutions, many of whom commute weekly between home governorates and university cities \cite{mes_statistics}. The cost of commercial transport is a significant financial burden for this demographic.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Problem Statement}
+
+The core problem addressed by ForsaDrive can be stated as follows:
+
+\begin{mdframed}[backgroundcolor=fdnavy!5, linecolor=fdnavy, linewidth=1.5pt, leftmargin=0.5cm, rightmargin=0.5cm]
+\textbf{Problem Statement:} Tunisian commuters — particularly students, professionals, and residents of underserved areas — lack access to a safe, affordable, structured, and technology-mediated carpooling platform adapted to local infrastructure, payment systems, and regulatory requirements. Existing international solutions do not address the specific needs of this market, while informal arrangements offer no safety guarantees, price transparency, or accountability mechanisms.
+\end{mdframed}
+
+\vspace{0.5cm}
+
+This problem decomposes into the following sub-problems:
+
+\begin{enumerate}[noitemsep]
+    \item \textbf{Discovery gap:} passengers cannot easily find drivers travelling to the same destination at the same time.
+    \item \textbf{Trust deficit:} without identity verification, rating systems, or complaint mechanisms, users cannot make informed decisions about their travel companions.
+    \item \textbf{Payment friction:} cash-based arrangements are inconvenient; existing digital payment solutions are not universally accessible in Tunisia.
+    \item \textbf{No institutional support:} organisations (universities, companies) cannot negotiate group carpooling agreements or discount programmes for their members.
+    \item \textbf{Mobile accessibility:} the target demographic is predominantly smartphone-first; a web-only solution would exclude a large portion of potential users.
+\end{enumerate}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Project Objectives}
+
+Based on the problem statement above, the following objectives were formally defined at project inception:
+
+\begin{table}[H]
+\centering
+\caption{Formal Project Objectives}
+\label{tab:objectives}
+\begin{tabularx}{\textwidth}{c l X}
+\toprule
+\textbf{ID} & \textbf{Objective} & \textbf{Success Criterion} \\
+\midrule
+O1 & Dual-platform delivery & Web application and Flutter mobile app both functional \\
+O2 & Core ride-sharing workflow & Users can publish, search, book, and complete rides \\
+O3 & Driver verification & Vehicle (carte grise) photo upload enforced at registration \\
+O4 & In-app wallet & Balance top-up, deduction, and transaction history operational \\
+O5 & Referral programme & Users can share and redeem referral codes with TND rewards \\
+O6 & Messaging & Users can exchange messages within a ride conversation \\
+O7 & Security & All inputs validated; sessions protected; passwords hashed \\
+O8 & Admin control & Admin can manage users, rides, complaints, and verifications \\
+O9 & Tunisia localisation & 24 governorates supported; currency in TND; French/Arabic ready \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Development Methodology}
+
+\subsection{Choice of Methodology}
+
+Given the scope and the two-person team size, an \textbf{Agile-Scrum} methodology was adopted. Agile's iterative, incremental approach was well-suited to a project where requirements could be refined as implementation revealed new constraints. Scrum's sprint-based structure provided a rhythm for progress reviews with the supervisor.
+
+\subsection{Scrum Adaptation}
+
+Standard Scrum was adapted to a two-developer academic context:
+\begin{itemize}[noitemsep]
+    \item \textbf{Sprint duration:} 3 weeks.
+    \item \textbf{Ceremonies:} Sprint planning at the start of each sprint; weekly stand-up between the two developers; sprint review with the supervisor at sprint end.
+    \item \textbf{Artefacts:} Product backlog maintained as a prioritised feature list; sprint backlog derived per sprint; definition of done required functional implementation, basic testing, and documentation update.
+    \item \textbf{Roles:} Supervisor acted as Product Owner for requirement prioritisation; both developers served jointly as the Scrum Team.
+\end{itemize}
+
+\subsection{Sprint Overview}
+
+\begin{table}[H]
+\centering
+\caption{Sprint Planning Summary}
+\label{tab:sprints}
+\begin{tabularx}{\textwidth}{c l X}
+\toprule
+\textbf{Sprint} & \textbf{Duration} & \textbf{Key Deliverables} \\
+\midrule
+Sprint 1 & Weeks 1–3  & Project setup, database schema, authentication (login/signup/CAPTCHA), admin panel skeleton \\
+Sprint 2 & Weeks 4–6  & Ride management (create/search/book/cancel), notifications, payments wallet, dashboard \\
+Sprint 3 & Weeks 7–9  & Messaging, ratings, complaints, helpdesk, vehicles module, settings, profile pictures \\
+Sprint 4 & Weeks 10–12 & Mobile app (Flutter): auth, ride search, booking, profile; API layer; integration testing; deployment preparation \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section*{Chapter Conclusion}
+
+This chapter has established the academic framework of the project, analysed the Tunisian transportation problem in depth, formalised the problem statement, and described the Agile-Scrum development methodology. The next chapter will survey existing solutions and derive the system requirements.
+
+%=============================================================================
+%  CHAPTER 3 — EXISTING SOLUTIONS AND REQUIREMENTS ANALYSIS
+%=============================================================================
+\chapter{Existing Solutions and Requirements Analysis}
+
+\section*{Chapter Introduction}
+This chapter surveys existing ride-sharing and carpooling platforms, critically assesses their suitability for the Tunisian context, identifies the stakeholders of ForsaDrive, and derives the functional and non-functional requirements that the system must satisfy.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Study of Existing Solutions}
+
+\subsection{BlaBlaCar}
+
+BlaBlaCar \cite{blablacar} is the world's largest long-distance carpooling platform, operating in over 22 countries. Drivers publish planned journeys and offer seats at a fixed price-per-seat. BlaBlaCar's trust infrastructure (profile verification, rating system, and identity checks) is its defining strength. However, BlaBlaCar does not operate in Tunisia and does not support Tunisian payment instruments or governorate-based geographic search.
+
+\subsection{Bolt and InDriver}
+
+Bolt \cite{bolt} and InDriver \cite{indriver} are ride-hailing (taxi-replacement) platforms that have entered North African and sub-Saharan markets. InDriver operates a unique negotiation model where passengers propose a price and nearby drivers accept or counter-offer. Both platforms focus on on-demand urban taxi services and are not designed for scheduled, shared carpooling. Neither platform supports organisational accounts, student-specific discounts, or inter-city carpooling workflows.
+
+\subsection{Yassir}
+
+Yassir \cite{yassir} is a North African super-app offering ride-hailing, food delivery, and financial services, primarily targeting Algeria. It has expanded partially into Tunisia but is oriented towards taxi-hailing rather than carpooling. Its payment infrastructure is well-adapted to the North African context, which provides a reference model for local payment integration.
+
+\subsection{Covoiturage.tn and Informal Solutions}
+
+Several Tunisian web forums and Facebook groups facilitate informal ride-sharing arrangements. Covoiturage.tn is a basic classifieds-style website where users post ride announcements. These solutions lack real-time search, booking management, in-app payments, identity verification, and mobile applications.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Critical Comparative Analysis}
+
+\begin{table}[H]
+\centering
+\caption{Comparative Analysis of Existing Ride-Sharing Solutions}
+\label{tab:comparison}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{l C{1.5cm} C{1.5cm} C{1.5cm} C{1.5cm} C{1.5cm}}
+\toprule
+\textbf{Feature} & \textbf{BlaBlaCar} & \textbf{Bolt} & \textbf{InDriver} & \textbf{Covoiturage.tn} & \textbf{ForsaDrive} \\
+\midrule
+Carpooling (planned) & \ding{51} & \ding{55} & \ding{55} & \ding{51} & \ding{51} \\
+Mobile app & \ding{51} & \ding{51} & \ding{51} & \ding{55} & \ding{51} \\
+Web app & \ding{51} & \ding{55} & \ding{55} & \ding{51} & \ding{51} \\
+Tunisia-specific & \ding{55} & Partial & Partial & \ding{51} & \ding{51} \\
+Local payment & \ding{55} & \ding{55} & \ding{55} & \ding{55} & Planned \\
+Driver verification & \ding{51} & \ding{51} & \ding{51} & \ding{55} & \ding{51} \\
+In-app messaging & \ding{51} & \ding{51} & \ding{51} & \ding{55} & \ding{51} \\
+Rating system & \ding{51} & \ding{51} & \ding{51} & \ding{55} & \ding{51} \\
+Org/corporate accounts & \ding{55} & \ding{55} & \ding{55} & \ding{55} & \ding{51} \\
+Student discounts & \ding{55} & \ding{55} & \ding{55} & \ding{55} & \ding{51} \\
+Referral programme & Partial & Partial & \ding{55} & \ding{55} & \ding{51} \\
+Admin panel & -- & -- & -- & -- & \ding{51} \\
+Helpdesk & -- & \ding{51} & \ding{51} & \ding{55} & \ding{51} \\
+Open source & \ding{55} & \ding{55} & \ding{55} & \ding{55} & \ding{51} \\
+\bottomrule
+\end{tabularx}
+\footnotesize \ding{51} = Present, \ding{55} = Absent, -- = Unknown/Not applicable
+\end{table}
+
+\noindent The comparative analysis reveals that no existing solution adequately addresses the full set of Tunisian carpooling requirements. ForsaDrive uniquely combines a web and mobile platform, Tunisia-specific localisation, organisational accounts, student discounts, and a planned local payment integration.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Stakeholders Identification}
+
+\begin{table}[H]
+\centering
+\caption{System Stakeholders}
+\label{tab:stakeholders}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Stakeholder} & \textbf{Type} & \textbf{Interest in the System} \\
+\midrule
+Passenger & Primary user & Search and book affordable rides; rate drivers; manage wallet \\
+Driver & Primary user & Publish rides; manage bookings; earn money; manage vehicle \\
+Student & Primary user (specialised) & Access student-discounted fares \\
+Organisation & External entity & Register corporate account; obtain employee discounts \\
+Admin & Internal operator & Manage platform; validate users; resolve disputes \\
+Helpdesk Agent & Internal operator & Respond to user support tickets \\
+System (automated) & Internal & Generate notifications, enforce business rules \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Functional Requirements}
+
+The following functional requirements were elicited from stakeholder analysis, user stories, and comparative benchmarking:
+
+\begin{table}[H]
+\centering
+\caption{Functional Requirements}
+\label{tab:func-req}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{ID} & \textbf{Category} & \textbf{Requirement} \\
+\midrule
+FR01 & Authentication & The system shall allow users to register with email, password, date of birth, and phone number \\
+FR02 & Authentication & The system shall enforce a CAPTCHA on registration and login forms \\
+FR03 & Authentication & The system shall allow users to log in and maintain an authenticated session \\
+FR04 & Profile & The system shall allow users to upload and update a profile photograph with client-side face validation \\
+FR05 & Profile & The system shall store user region (Tunisian governorate) and municipality \\
+FR06 & Driver & The system shall require drivers to provide vehicle details and upload a vehicle registration card (carte grise) photograph during registration \\
+FR07 & Rides & The system shall allow drivers to publish ride offers with origin, destination, date/time, price per seat, and available seats \\
+FR08 & Rides & The system shall allow passengers to search for rides by origin, destination, and date \\
+FR09 & Booking & The system shall allow passengers to book available seats on a ride \\
+FR10 & Booking & The system shall deduct the ride cost from the passenger's wallet at booking \\
+FR11 & Booking & The system shall notify the driver of new booking requests \\
+FR12 & Booking & The system shall allow passengers to cancel a booking and receive a refund \\
+FR13 & Payments & The system shall provide each user with an in-app wallet with a current balance \\
+FR14 & Payments & The system shall support simulated wallet top-ups (with future real payment gateway integration) \\
+FR15 & Referral & The system shall assign a unique referral code to each user \\
+FR16 & Referral & The system shall credit 10\,TND to the referrer and 5\,TND to the new user upon referral code redemption \\
+FR17 & Messaging & The system shall allow passengers and drivers on the same ride to exchange messages \\
+FR18 & Ratings & The system shall allow passengers and drivers to rate each other after a completed ride \\
+FR19 & Complaints & The system shall allow users to submit complaints about rides or other users \\
+FR20 & Helpdesk & The system shall provide a real-time helpdesk chat between users and helpdesk agents \\
+FR21 & Admin & The system shall provide an administrative panel with user management, ride oversight, complaint handling, and analytics \\
+FR22 & Organisations & The system shall allow organisations to register and receive configurable discount codes for their members \\
+FR23 & Students & The system shall apply a 50\% fare discount for verified student accounts \\
+FR24 & Notifications & The system shall send in-app notifications for booking confirmations, cancellations, and messages \\
+FR25 & Mobile & The mobile application shall replicate the core passenger and driver workflows of the web application \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Non-Functional Requirements}
+
+\begin{table}[H]
+\centering
+\caption{Non-Functional Requirements}
+\label{tab:nonfunc-req}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{ID} & \textbf{Category} & \textbf{Requirement} \\
+\midrule
+NFR01 & Security & All user passwords shall be stored as bcrypt hashes \\
+NFR02 & Security & All POST inputs shall be sanitised before database operations \\
+NFR03 & Security & The system shall protect against \gls{xss} via HTML entity encoding on all output \\
+NFR04 & Security & The system shall use prepared statements for all SQL queries (\gls{pdo}) \\
+NFR05 & Performance & Page load time for core pages (dashboard, ride search) shall not exceed 3 seconds under normal server conditions \\
+NFR06 & Usability & The web application shall be fully responsive across mobile, tablet, and desktop viewports \\
+NFR07 & Usability & The registration process shall be completed within a multi-step wizard of no more than 3 steps \\
+NFR08 & Availability & The system shall be designed for deployment on a LAMP/LAMPP stack with no single-vendor lock-in \\
+NFR09 & Maintainability & The codebase shall follow a consistent naming convention and directory structure \\
+NFR10 & Scalability & The database layer shall be abstracted via a \gls{pdo}-based class to facilitate migration from SQLite to MySQL/PostgreSQL \\
+NFR11 & Compatibility & The web application shall be compatible with Chrome, Firefox, Edge, and Safari (latest 2 major versions) \\
+NFR12 & Compatibility & The mobile application shall target Android 8.0+ and iOS 13+ \\
+NFR13 & Localisation & The platform shall support English (primary), French, and Arabic (with RTL layout support) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Project Constraints}
+
+The following constraints influenced design and implementation decisions:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Academic timeline:} The project was developed over approximately 12 weeks, constraining the scope of features that could be fully implemented.
+    \item \textbf{Payment gateway:} No real Tunisian payment gateway was available for integration during development; a simulated top-up mechanism was implemented as a placeholder.
+    \item \textbf{Hosting:} The system was developed and tested on a local LAMPP stack. Production deployment infrastructure was not provisioned during the project period.
+    \item \textbf{Team size:} A two-person team limited the throughput of parallel development, particularly the simultaneous advancement of the web and mobile platforms.
+    \item \textbf{Database:} SQLite was chosen for development simplicity. It imposes constraints on concurrent write operations that would necessitate migration to MySQL or PostgreSQL for production.
+\end{itemize}
+
+\section*{Chapter Conclusion}
+
+The comparative analysis confirmed that no existing solution adequately serves the Tunisian carpooling market. The stakeholder identification and requirements elicitation exercises produced 25 functional requirements and 13 non-functional requirements, which will serve as the basis for system analysis and design in the following chapters.
+
+%=============================================================================
+%  CHAPTER 4 — SYSTEM ANALYSIS AND SPECIFICATION
+%=============================================================================
+\chapter{System Analysis and Specification}
+
+\section*{Chapter Introduction}
+This chapter translates the requirements defined in Chapter~3 into formal system models. It presents the business process analysis, \gls{uml} use case diagrams with detailed descriptions, the business rules governing system behaviour, and the conceptual data model.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Business Analysis}
+
+ForsaDrive mediates a two-sided marketplace. The core business process is the \textbf{ride lifecycle}, which passes through the following states:
+
+\begin{enumerate}[noitemsep]
+    \item \textbf{Published:} A driver creates a ride offer with route, date, price, and seat count.
+    \item \textbf{Booking requested:} A passenger requests a seat; their wallet balance is conditionally reserved.
+    \item \textbf{Confirmed:} The driver accepts the booking; the balance is deducted.
+    \item \textbf{Completed:} The driver marks the ride as completed; both parties may submit ratings.
+    \item \textbf{Cancelled:} Either party cancels; reserved balance is refunded to the passenger.
+\end{enumerate}
+
+Parallel to the ride lifecycle, a \textbf{financial lifecycle} governs the in-app wallet: balance is loaded via top-up, decreased by bookings and possibly complaints, and increased by referral bonuses and refunds.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Actors}
+
+ForsaDrive involves eight distinct actors:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Guest:} An unauthenticated visitor who can view the landing page, initiate registration, and log in.
+    \item \textbf{Passenger:} An authenticated user who can search and book rides, manage their wallet, message drivers, and submit ratings/complaints. Extends Guest.
+    \item \textbf{Driver:} An authenticated user with vehicle information who can publish rides, manage booking requests, and access driver-specific analytics. Extends Passenger.
+    \item \textbf{Student:} A Passenger with a verified student status that entitles them to discounted fares. Extends Passenger.
+    \item \textbf{Organisation:} An external entity (company, university) that registers on the platform to access group discount agreements.
+    \item \textbf{Helpdesk Agent:} A platform employee who handles user support tickets via a dedicated helpdesk module.
+    \item \textbf{Admin:} A platform administrator with full access to user management, ride oversight, complaint handling, and system statistics.
+    \item \textbf{System:} Automated processes that generate notifications, apply business rules, and manage scheduled tasks.
+\end{itemize}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Use Case Diagrams}
+
+\begin{figure}[H]
+\centering
+% ── Replace this placeholder with your exported PlantUML diagram image ──
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{3cm}
+\textbf{[INSERT USE CASE DIAGRAM — GLOBAL]}\\[0.3cm]
+\textit{Exported from PlantUML. Shows all 8 actors and their relationships}\\
+\textit{(Guest, Passenger, Driver, Student, Organisation, Helpdesk Agent, Admin, System)}\\
+\textit{with actor generalisations and the major use case packages.}
+\vspace{3cm}}}
+\caption{ForsaDrive Global Use Case Diagram}
+\label{fig:usecase-global}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{2.5cm}
+\textbf{[INSERT USE CASE DIAGRAM — AUTHENTICATION \& ACCOUNT MANAGEMENT]}\\[0.3cm]
+\textit{Zoomed-in view of the authentication and account management use cases.}
+\vspace{2.5cm}}}
+\caption{Use Case Diagram: Authentication and Account Management}
+\label{fig:usecase-auth}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{2.5cm}
+\textbf{[INSERT USE CASE DIAGRAM — RIDE LIFECYCLE]}\\[0.3cm]
+\textit{Shows Publish Ride, Search Rides, Book Ride, Accept/Reject Booking, Complete Ride,}\\
+\textit{Cancel Booking with \texttt{$<<$include$>>$} and \texttt{$<<$extend$>>$} relationships.}
+\vspace{2.5cm}}}
+\caption{Use Case Diagram: Ride Lifecycle}
+\label{fig:usecase-ride}
+\end{figure}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Detailed Use Case Descriptions}
+
+\begin{ucbox}{UC-01: Register as Passenger}
+\begin{description}[noitemsep, font=\bfseries, leftmargin=3.5cm]
+\item[Actor:] Guest
+\item[Pre-condition:] User is not authenticated; email address is not already registered.
+\item[Main Flow:]
+    1. User navigates to the registration page.\\
+    2. User completes Step 1: personal information (name, email, DOB, gender, phone, password, CAPTCHA).\\
+    3. System validates all fields; highlights errors if any.\\
+    4. User completes Step 2: location (governorate, municipality, street address).\\
+    5. User completes Step 3: selects role (Passenger), uploads optional profile photo; face-api.js validates single face.\\
+    6. User submits the form.\\
+    7. System inserts new user record, generates a unique referral code, and redirects to login.
+\item[Alternative Flow:] A3 — CAPTCHA answer is wrong: system regenerates CAPTCHA and redisplays form with error.
+\item[Post-condition:] New user record created with \texttt{is\_driver=0}; referral code assigned.
+\end{description}
+\end{ucbox}
+
+\vspace{0.5cm}
+
+\begin{ucbox}{UC-02: Register as Driver}
+\begin{description}[noitemsep, font=\bfseries, leftmargin=3.5cm]
+\item[Actor:] Guest
+\item[Pre-condition:] Same as UC-01.
+\item[Main Flow:]
+    1. Steps 1–2 as in UC-01.\\
+    2. In Step 3, user selects role (Driver).\\
+    3. System reveals the Vehicle Information sub-form.\\
+    4. User enters vehicle type, make, model, year, colour, plate number, seats, AC, luggage capacity.\\
+    5. User uploads an optional vehicle photograph.\\
+    6. User uploads a \textbf{required} vehicle registration card (carte grise) photograph.\\
+    7. System inserts user record (\texttt{is\_driver=1}), vehicle record, and driver profile record.
+\item[Alternative Flow:] A6 — Carte grise image not provided: system prevents form submission with validation error.
+\item[Post-condition:] User, vehicle, and driver\_profile records created; user can publish rides.
+\end{description}
+\end{ucbox}
+
+\vspace{0.5cm}
+
+\begin{ucbox}{UC-03: Book a Ride}
+\begin{description}[noitemsep, font=\bfseries, leftmargin=3.5cm]
+\item[Actor:] Passenger
+\item[Pre-condition:] Passenger is authenticated; ride exists with available seats; passenger has sufficient wallet balance.
+\item[Main Flow:]
+    1. Passenger searches for rides (origin, destination, date).\\
+    2. System returns matching rides ordered by relevance.\\
+    3. Passenger selects a ride and views details.\\
+    4. Passenger clicks ``Book''; system checks balance and seat availability.\\
+    5. System deducts ride cost from wallet, creates booking record (status: pending), and notifies driver.\\
+    6. Driver receives notification and accepts/rejects booking.\\
+    7. On acceptance, booking status changes to \texttt{confirmed}.
+\item[Alternative Flow:] A4a — Insufficient balance: system blocks booking and redirects to payments page. A4b — No seats remaining: system displays error.
+\item[Post-condition:] Booking record created; wallet balance reduced; driver notified.
+\end{description}
+\end{ucbox}
+
+\vspace{0.5cm}
+
+\begin{ucbox}{UC-04: Redeem Referral Code}
+\begin{description}[noitemsep, font=\bfseries, leftmargin=3.5cm]
+\item[Actor:] Passenger
+\item[Pre-condition:] Passenger has not previously redeemed a referral code; code entered is valid and belongs to a different user.
+\item[Main Flow:]
+    1. Passenger navigates to the Payments page.\\
+    2. Passenger enters a referral code in the ``Enter a Friend's Code'' field.\\
+    3. System validates the code.\\
+    4. System credits 5\,TND to the passenger's wallet and 10\,TND to the code owner's wallet.\\
+    5. System records the referral relationship (\texttt{users.referred\_by}) and logs both payment transactions.
+\item[Alternative Flow:] A3a — Code not found: error ``Invalid referral code''. A3b — Own code entered: error ``You cannot use your own referral code''. A3c — Already redeemed: error displayed.
+\item[Post-condition:] Both wallets updated; referral relationship recorded; one-time flag set.
+\end{description}
+\end{ucbox}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Business Rules}
+
+\begin{table}[H]
+\centering
+\caption{Business Rules}
+\label{tab:business-rules}
+\begin{tabularx}{\textwidth}{l X}
+\toprule
+\textbf{ID} & \textbf{Rule} \\
+\midrule
+BR01 & A user must be at least 18 years of age to register. \\
+BR02 & A driver may not book their own ride. \\
+BR03 & A passenger's wallet balance must equal or exceed the ride price before a booking is permitted. \\
+BR04 & A student discount of 50\% applies automatically to any booking made by a verified student account. \\
+BR05 & A referral code may only be redeemed once per user account. A user may not redeem their own referral code. \\
+BR06 & The referrer receives 10\,TND and the new user receives 5\,TND upon a successful referral code redemption. \\
+BR07 & A cancelled booking triggers a full refund to the passenger's wallet, provided the ride has not yet been marked as completed. \\
+BR08 & A rating may only be submitted once per booking, by each party (passenger and driver), after the ride is marked as completed. \\
+BR09 & An organisation discount code reduces the ride price by a percentage configured at the time of organisation registration (10\%–50\%). \\
+BR10 & A suspended or banned user account shall not be permitted to log in. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Data Model}
+
+\subsection{Conceptual Entity-Relationship Diagram}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{5cm}
+\textbf{[INSERT ENTITY-RELATIONSHIP DIAGRAM]}\\[0.3cm]
+\textit{Tool: draw.io, Lucidchart, or DB Diagram.}\\[0.2cm]
+\textit{Entities: users, rides, bookings, vehicles, payments, ratings,}\\
+\textit{notifications, conversations, messages, complaints,}\\
+\textit{driver\_profiles, student\_verifications,}\\
+\textit{organizations, org\_members, helpdesk\_conversations, helpdesk\_messages.}\\[0.2cm]
+\textit{Key relationships:}\\
+\textit{users (1)---(N) rides (driver)}\\
+\textit{users (1)---(N) bookings (passenger)}\\
+\textit{rides (1)---(N) bookings}\\
+\textit{users (1)---(N) vehicles}\\
+\textit{conversations (1)---(N) messages}
+\vspace{2cm}}}
+\caption{ForsaDrive Conceptual Entity-Relationship Diagram}
+\label{fig:erd}
+\end{figure}
+
+\subsection{Key Entity Descriptions}
+
+\paragraph{users} The central entity of the system. Stores authentication credentials (email, bcrypt password), personal information (username, date\_of\_birth, gender, phone, governorate, municipality, address), role flags (\texttt{is\_driver}, \texttt{is\_student}, \texttt{is\_admin}, \texttt{is\_helpdesk\_agent}), account state (\texttt{suspended}, \texttt{ban\_reason}), financial data (\texttt{balance}), profile picture path, and referral data (\texttt{referral\_code}, \texttt{referred\_by}).
+
+\paragraph{rides} Represents a published ride offer. Key attributes: \texttt{driver\_id} (FK→users), \texttt{origin}, \texttt{destination}, \texttt{departure\_at} (datetime), \texttt{price\_per\_seat}, \texttt{available\_seats}, \texttt{status} (active/completed/cancelled).
+
+\paragraph{bookings} Represents a seat reservation by a passenger on a ride. Key attributes: \texttt{ride\_id} (FK→rides), \texttt{passenger\_id} (FK→users), \texttt{seats\_booked}, \texttt{total\_price}, \texttt{status} (pending/confirmed/cancelled/completed).
+
+\paragraph{vehicles} Stores vehicle information linked to a driver. Key attributes: \texttt{user\_id}, \texttt{type}, \texttt{make}, \texttt{model}, \texttt{year}, \texttt{colour}, \texttt{plate\_number}, \texttt{seats}, \texttt{has\_ac}, \texttt{luggage}, \texttt{photo} (vehicle photo path), \texttt{id\_card\_photo} (carte grise photo path).
+
+\paragraph{payments} An append-only transaction ledger. Each row records a \texttt{user\_id}, \texttt{amount} (positive = credit, negative = debit), \texttt{description}, and \texttt{created\_at}.
+
+\paragraph{conversations / messages} A conversation is linked to two users and optionally a ride. Messages are associated with a conversation and carry read state (\texttt{is\_read}).
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Sequence Diagrams}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{3.5cm}
+\textbf{[INSERT SEQUENCE DIAGRAM — BOOK A RIDE]}\\[0.3cm]
+\textit{Actors: Passenger Browser, Web Server (PHP), SQLite DB.}\\
+\textit{Flow: GET book\_ride.php → search query → SELECT rides → display results →}\\
+\textit{POST booking → check balance → BEGIN TRANSACTION → INSERT booking →}\\
+\textit{UPDATE balance → INSERT notification → COMMIT → redirect.}
+\vspace{3.5cm}}}
+\caption{Sequence Diagram: Booking a Ride}
+\label{fig:seq-booking}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{3cm}
+\textbf{[INSERT SEQUENCE DIAGRAM — USER AUTHENTICATION (WEB)]}\\[0.3cm]
+\textit{Actors: Browser, Web Server, SQLite DB.}\\
+\textit{Flow: GET login.php → CAPTCHA generation → POST credentials →}\\
+\textit{verify password\_hash() → session\_start() → \_SESSION assignment → redirect.}
+\vspace{3cm}}}
+\caption{Sequence Diagram: User Authentication (Web Application)}
+\label{fig:seq-auth}
+\end{figure}
+
+\section*{Chapter Conclusion}
+
+This chapter has formalised the system through use case models, detailed use case descriptions, business rules, and a conceptual data model. These artefacts provide the specification baseline against which the design decisions in the next chapter are justified.
+
+%=============================================================================
+%  CHAPTER 5 — SYSTEM DESIGN
+%=============================================================================
+\chapter{System Design}
+
+\section*{Chapter Introduction}
+This chapter presents the architectural and design decisions underlying ForsaDrive. It covers the technology stack, the global system architecture, database design, web application design, mobile application design, security design, and UI/UX considerations.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Technology Stack and Justification}
+
+\begin{table}[H]
+\centering
+\caption{Technology Stack}
+\label{tab:tech-stack}
+\begin{tabularx}{\textwidth}{l l l X}
+\toprule
+\textbf{Layer} & \textbf{Technology} & \textbf{Version} & \textbf{Justification} \\
+\midrule
+Web server      & Apache (LAMPP)  & 2.4   & Widely deployed; integrated PHP support; suitable for LAMP production \\
+Backend lang.   & PHP             & 8.2   & Mature, fast for web, extensive library ecosystem; team familiarity \\
+Database        & SQLite          & 3.x   & Zero-configuration; file-based; \gls{pdo} abstraction allows future migration to MySQL \\
+DB abstraction  & PHP PDO         & --    & Prepared statements prevent SQL injection; driver-agnostic \\
+CSS framework   & Bootstrap       & 5.3   & Responsive grid, extensive component library, minimal custom CSS needed \\
+Icon library    & Font Awesome    & 6.4   & Comprehensive icon set; SVG-based; free tier sufficient \\
+JS (client)     & Vanilla JS      & ES2022& No build pipeline required; keeps frontend lightweight \\
+Face detection  & face-api.js     & 0.22  & Client-side TinyFaceDetector; no server processing required for photo validation \\
+Mobile lang.    & Dart            & 3.x   & Statically typed; compiles to native ARM; Flutter's language \\
+Mobile framework & Flutter        & 3.x   & Single codebase → Android + iOS; rich widget library; strong community \\
+Mobile HTTP     & Dio             & --    & HTTP client for Flutter; interceptors, FormData, retry support \\
+Mobile auth     & flutter\_secure\_storage & -- & Secure token storage in device keychain/keystore \\
+Mobile maps     & flutter\_map    & --    & OpenStreetMap-based; no API key required; Tunisia-compatible \\
+Mobile state    & Provider        & --    & Lightweight state management; well-suited to project scale \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Global System Architecture}
+
+ForsaDrive follows a three-tier architecture:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Presentation tier:} The web browser (PHP-rendered HTML/CSS/JS) and the Flutter mobile application.
+    \item \textbf{Logic tier:} The PHP application server handles both server-side rendering for the web client and RESTful API responses (\gls{json}) for the mobile client.
+    \item \textbf{Data tier:} The SQLite database accessed exclusively through PHP PDO.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{4cm}
+\textbf{[INSERT GLOBAL ARCHITECTURE DIAGRAM]}\\[0.3cm]
+\textit{Draw as a layered diagram showing:}\\
+\textit{- Web Browser (Bootstrap 5 + JS) ←→ Apache/PHP (sessions + HTML rendering)}\\
+\textit{- Flutter Mobile App ←→ REST API (PHP JSON endpoints, JWT/Bearer auth)}\\
+\textit{- Both PHP layers ←→ PDO ←→ SQLite DB}\\
+\textit{- Src/ folder for uploaded media}\\
+\textit{- face-api.js (client-side, browser only)}
+\vspace{2.5cm}}}
+\caption{ForsaDrive Global System Architecture}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{Web Application Architecture}
+
+The web application follows a procedural page-controller pattern, where each PHP file acts as a self-contained controller that handles HTTP requests, interacts with the database through \gls{oop} model classes, and renders its own view. Shared infrastructure (session management, database connection, language, header, sidebar) is extracted into reusable includes.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{2.5cm}
+\textbf{[INSERT WEB COMPONENT DIAGRAM]}\\[0.3cm]
+\textit{Show: config.php → server/session.php → classes/*.php → Pages/*.php → include/*.php → Css/app.css}
+\vspace{2.5cm}}}
+\caption{Web Application Component Structure}
+\label{fig:web-components}
+\end{figure}
+
+\subsection{REST API for the Mobile Application}
+
+To serve the Flutter mobile client, the PHP backend exposes a stateless \gls{rest}ful API at \texttt{/api/}. Authentication is handled via \gls{jwt} Bearer tokens rather than PHP sessions, ensuring statelessness. Responses are \gls{json}-encoded with consistent envelope structure:
+
+\begin{lstlisting}[style=phpstyle, caption={Standard JSON API Response Envelope}]
+{
+  "success": true,
+  "data": { ... },
+  "message": "Operation successful",
+  "errors": []
+}
+\end{lstlisting}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Database Design}
+
+\subsection{Schema Overview}
+
+The database consists of 16 tables. The schema was designed with referential integrity enforced through SQLite foreign key constraints.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{5cm}
+\textbf{[INSERT DATABASE SCHEMA DIAGRAM]}\\[0.3cm]
+\textit{Generate from DB.db using a tool such as DBeaver, DB Browser for SQLite,}\\
+\textit{or draw manually. Show all 16 tables with primary keys, foreign keys, and key columns.}\\[0.2cm]
+\textit{Tables: users, rides, bookings, vehicles, payments, ratings, notifications,}\\
+\textit{conversations, messages, complaints, driver\_profiles, student\_verifications,}\\
+\textit{organizations, org\_members, helpdesk\_conversations, helpdesk\_messages.}
+\vspace{2.5cm}}}
+\caption{ForsaDrive Database Schema}
+\label{fig:db-schema}
+\end{figure}
+
+\subsection{Key Schema Decisions}
+
+\paragraph{SQLite as development database.} SQLite was chosen to eliminate the need for a running database server during development. The \gls{pdo} abstraction layer means the codebase can be migrated to MySQL or PostgreSQL for production with minimal changes — only the DSN connection string needs updating.
+
+\paragraph{Append-only payments ledger.} Rather than updating a balance column directly, all financial operations are recorded as rows in the \texttt{payments} table (positive = credit, negative = debit). The user's wallet balance is stored redundantly in \texttt{users.balance} for query performance but is always derivable from the ledger.
+
+\paragraph{Conversation normalisation.} A unique constraint on \texttt{(user\_a, user\_b, ride\_id)} in the \texttt{conversations} table ensures at most one conversation thread exists between two users for a given ride, preventing duplicate conversation creation.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Web Application Design}
+
+\subsection{Directory Structure}
+
+\begin{lstlisting}[basicstyle=\ttfamily\small, numbers=none, frame=none, caption={Project Directory Structure}]
+ForsaDrive/
+├── config.php              # DB config, autoloader
+├── index.php               # Public landing page
+├── setup_db.php            # DB migration script
+├── server/
+│   ├── session.php         # getDB(), isLoggedIn(), loginUser()...
+│   └── language.php        # i18n: t(), lang arrays
+├── api/
+│   ├── auth.php            # JWT auth endpoints
+│   ├── rides.php           # Ride CRUD endpoints
+│   ├── bookings.php        # Booking endpoints
+│   └── ...
+├── Pages/
+│   ├── login.php           # Login page/handler
+│   ├── signup.php          # Multi-step registration
+│   ├── interface.php       # Passenger dashboard
+│   ├── driver_dashboard.php
+│   ├── offre_ride.php      # Publish a ride
+│   ├── book_ride.php       # Search & book rides
+│   ├── my_rides.php        # Ride history
+│   ├── booking_requests.php # Driver booking mgmt
+│   ├── payments.php        # Wallet & transactions
+│   ├── messages.php        # Chat interface
+│   ├── ratings.php
+│   ├── complaints.php
+│   ├── helpdesk.php
+│   ├── notifications.php
+│   ├── vehicles.php
+│   ├── settings.php
+│   └── admin.php
+├── include/
+│   ├── header.php          # HTML head + Bootstrap CDN
+│   └── sidebar.php         # Navigation sidebar
+├── classes/
+│   ├── database.php        # PDO wrapper
+│   ├── users.php
+│   ├── rides.php
+│   ├── bookings.php
+│   ├── payments.php
+│   ├── messages.php
+│   ├── notifications.php
+│   ├── ratings.php
+│   └── complaints.php
+├── Css/
+│   ├── app.css             # Global application styles
+│   └── index.css           # Landing page styles
+├── Src/                    # Uploaded media (profiles, vehicles)
+├── data/
+│   └── tunisia_regions.php # Governorate → municipality map
+├── lang/
+│   ├── en.php
+│   ├── fr.php
+│   └── ar.php
+└── Database/
+    └── DB.db               # SQLite database file
+\end{lstlisting}
+
+\subsection{Session Management Pattern}
+
+The \texttt{server/session.php} module is the authentication backbone of the web application. It provides the \texttt{getDB()} function (singleton PDO connection), \texttt{isLoggedIn()} (checks \texttt{\$\_SESSION['user\_id']}), \texttt{loginUser()} (populates the session), \texttt{logoutUser()} (destroys the session), and \texttt{refreshUserInSession()} (re-reads user data from the database to the session after profile updates).
+
+Every protected page begins with:
+\begin{lstlisting}[style=phpstyle, caption={Standard Page Access Guard}]
+<?php
+require_once '../server/session.php';
+if (!isLoggedIn()) {
+    header('Location: login.php');
+    exit();
+}
+$db  = getDB();
+$uid = $_SESSION['user_id'];
+\end{lstlisting}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Mobile Application Design}
+
+\subsection{Architecture}
+
+The Flutter mobile application follows a layered architecture:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Presentation layer:} Flutter widgets (screens and reusable components).
+    \item \textbf{ViewModel / Provider layer:} \texttt{ChangeNotifier}-based providers manage application state and coordinate between the presentation layer and the data layer.
+    \item \textbf{Data layer:} Repository classes abstract API calls and local cache. \texttt{Dio} handles HTTP requests; \texttt{flutter\_secure\_storage} stores the JWT token.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{3.5cm}
+\textbf{[INSERT FLUTTER ARCHITECTURE DIAGRAM]}\\[0.3cm]
+\textit{Show: Screens → Providers (ChangeNotifier) → Repositories → Dio HTTP Client → REST API}\\
+\textit{Plus: flutter\_secure\_storage for JWT token; flutter\_map for map display.}
+\vspace{3.5cm}}}
+\caption{Flutter Mobile Application Architecture}
+\label{fig:flutter-arch}
+\end{figure}
+
+\subsection{Navigation Flow}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{3.5cm}
+\textbf{[INSERT MOBILE NAVIGATION FLOW DIAGRAM]}\\[0.3cm]
+\textit{Splash → Login/Register → Home (tab bar)}\\
+\textit{Tabs: [Search Rides | My Rides | Messages | Profile]}\\
+\textit{Driver extra tab: [My Offered Rides + Create Ride]}\\
+\textit{Show screen transitions and modal sheets.}
+\vspace{3.5cm}}}
+\caption{Mobile Application Navigation Flow}
+\label{fig:mobile-nav}
+\end{figure}
+
+\subsection{Scope of the Mobile Application}
+
+The mobile application targets the two primary roles: \textbf{Passenger} and \textbf{Driver}. Administrative functions are web-only, as they require complex data management interfaces not well-suited to a small mobile screen. The mobile app implements:
+
+\begin{itemize}[noitemsep]
+    \item Registration and login (with JWT token storage).
+    \item Ride search with origin/destination selection and result listing.
+    \item Ride details and booking.
+    \item My Rides (upcoming and past bookings).
+    \item Driver: Create Ride, view and respond to booking requests.
+    \item In-app messaging (ride-specific conversations).
+    \item Profile management (photo, name, region).
+    \item Wallet balance display.
+\end{itemize}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Security Design}
+
+Security was addressed at multiple layers:
+
+\begin{table}[H]
+\centering
+\caption{Security Controls by Layer}
+\label{tab:security}
+\begin{tabularx}{\textwidth}{l X}
+\toprule
+\textbf{Layer} & \textbf{Control} \\
+\midrule
+Authentication & PHP \texttt{password\_hash()} (bcrypt, cost 12) for storage; \texttt{password\_verify()} for login; CAPTCHA (server-side math challenge) against automated registration \\
+Session & PHP sessions with \texttt{session\_regenerate\_id(true)} on login to prevent session fixation; \texttt{session\_destroy()} on logout \\
+Input validation & All user inputs sanitised with \texttt{htmlspecialchars()} on output (\gls{xss} prevention); prepared statements via PDO for all SQL (SQL injection prevention) \\
+Access control & Role-based: \texttt{isLoggedIn()} guard on all protected pages; admin flag check on admin panel; driver flag check on driver pages \\
+File uploads & MIME type validation via \texttt{mime\_content\_type()} (not relying on client-reported type); file extension whitelist; files stored outside webroot-reachable paths or with randomised names \\
+API (mobile) & JWT Bearer token with configurable expiry; token validated on every API request \\
+Account management & Admin can suspend accounts; suspended users are blocked at login \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{UI/UX Design Decisions}
+
+\subsection{Web Application}
+
+The web application's visual design follows a consistent design system defined in \texttt{Css/app.css}:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Colour palette:} Navy blue (\texttt{\#0a2540}) as the primary brand colour; amber (\texttt{\#f59e0b}) as the accent; semantic green/red for success/danger states.
+    \item \textbf{Typography:} Segoe UI system font stack for familiarity and performance.
+    \item \textbf{Layout:} Fixed-position sidebar (260\,px) on desktop; transforms to a slide-in overlay on mobile (\texttt{max-width: 991px}).
+    \item \textbf{Components:} Custom \texttt{.fd-card}, \texttt{.stat-card}, \texttt{.ride-item}, \texttt{.bubble} (chat), and \texttt{.badge-pill} components supplement Bootstrap 5 defaults.
+    \item \textbf{Glassmorphism navbar:} The landing page uses \texttt{backdrop-filter: blur(14px)} for a modern, depth-conveying navigation effect.
+\end{itemize}
+
+\subsection{Mobile Application}
+
+The Flutter mobile application mirrors the web application's design language while respecting mobile-first conventions: larger touch targets, bottom navigation bar, card-based ride listings, and map integration for ride origin/destination visualisation.
+
+\section*{Chapter Conclusion}
+
+This chapter has presented the complete design of ForsaDrive across both platforms. The choice of PHP+SQLite for the backend, Bootstrap 5 for the web frontend, and Flutter for the mobile client was driven by productivity, team competence, and deployment simplicity considerations. The next chapter describes how this design was realised in implementation.
+
+%=============================================================================
+%  CHAPTER 6 — IMPLEMENTATION
+%=============================================================================
+\chapter{Implementation}
+
+\section*{Chapter Introduction}
+This chapter documents the implementation of ForsaDrive. It describes the development environment, the project structure, and the realisation of the system's key features on both the web and mobile platforms. Code excerpts are provided to illustrate significant implementation choices; full source code is available in the project repository.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Development Environment}
+
+\begin{table}[H]
+\centering
+\caption{Development Environment}
+\label{tab:dev-env}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Component} & \textbf{Tool / Version} & \textbf{Purpose} \\
+\midrule
+Operating System & Ubuntu 24.04 LTS & Development machine OS \\
+Web server stack & XAMPP / LAMPP 8.2 & Apache + PHP + SQLite on localhost \\
+Code editor & Visual Studio Code 1.9x & Primary \gls{ide} for PHP, JavaScript, Dart \\
+Mobile IDE & Android Studio (Hedgehog) & Flutter device emulator and Dart tooling \\
+Flutter SDK & 3.x & Mobile development \\
+Database browser & DB Browser for SQLite & Schema inspection and query testing \\
+Version control & Git + GitHub & Source control and collaboration \\
+API testing & Bruno (open-source) & REST API endpoint testing during development \\
+Diagrams & draw.io / PlantUML & UML and architecture diagrams \\
+Report & Overleaf + \LaTeX & This document \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Backend Implementation}
+
+\subsection{Database Abstraction Layer}
+
+The \texttt{classes/database.php} file provides a thin PDO wrapper:
+
+\begin{lstlisting}[style=phpstyle, caption={Database Class (Singleton PDO Wrapper)}]
+class Database {
+    private PDO $connection;
+
+    public function __construct(string $dbPath = null) {
+        $dbPath = $dbPath ?? __DIR__ . '/../Database/DB.db';
+        $this->connection = new PDO("sqlite:" . $dbPath);
+        $this->connection->setAttribute(PDO::ATTR_ERRMODE,
+                                        PDO::ERRMODE_EXCEPTION);
+    }
+
+    public function getConnection(): PDO {
+        return $this->connection;
+    }
+}
+\end{lstlisting}
+
+\noindent The \texttt{getDB()} function in \texttt{server/session.php} wraps this into a request-scoped singleton, ensuring that at most one database connection is opened per HTTP request.
+
+\subsection{User Model}
+
+The \texttt{classes/users.php} User class implements the \gls{orm} pattern for the \texttt{users} table:
+
+\begin{lstlisting}[style=phpstyle, caption={User::load() --- Hydrating a User from the Database}]
+public function load(int $userId): bool {
+    $stmt = $this->db->prepare("SELECT * FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $row  = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) return false;
+
+    $this->id       = $row['id'];
+    $this->username = $row['username'];
+    $this->email    = $row['email'];
+    $this->password = $row['password'];
+    $this->isDriver = (bool)$row['is_driver'];
+    $this->balance  = (float)($row['balance'] ?? 0.0);
+    $this->picture  = $row['picture'] ?? null;
+    // ... additional fields
+    return true;
+}
+\end{lstlisting}
+
+\subsection{Multi-Step Registration with CAPTCHA}
+
+The registration page (\texttt{Pages/signup.php}) implements a three-step wizard. A key implementation detail is the CAPTCHA timing: the random challenge values are generated only on the initial GET request and stored in the session. Regeneration occurs \textit{after} validation on POST to prevent the new values from overwriting the ones being checked.
+
+\begin{lstlisting}[style=phpstyle, caption={CAPTCHA Timing Fix --- Generate on GET Only}]
+// Generate CAPTCHA only on first GET (not on every POST —
+// that would overwrite the values before validation can check them).
+if (!isset($_SESSION['captcha_a'])) {
+    $_SESSION['captcha_a'] = random_int(1, 9);
+    $_SESSION['captcha_b'] = random_int(1, 9);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $captcha = (int)($_POST['captcha'] ?? -1);
+    if ($captcha !== ($_SESSION['captcha_a'] + $_SESSION['captcha_b'])) {
+        $errors[] = 'Incorrect answer to the security question.';
+    }
+    // Regenerate AFTER validation — not before
+    $_SESSION['captcha_a'] = random_int(1, 9);
+    $_SESSION['captcha_b'] = random_int(1, 9);
+}
+\end{lstlisting}
+
+\subsection{Driver Vehicle Registration Card Upload}
+
+During driver registration, uploading the vehicle registration card (\textit{carte grise}) is enforced. The server-side handler validates the file MIME type (not the client-reported content-type) and stores the file with a randomised name:
+
+\begin{lstlisting}[style=phpstyle, caption={Carte Grise Upload Handler}]
+$idCardPath = null;
+if (isset($_FILES['id_card_photo'])
+    && $_FILES['id_card_photo']['error'] === UPLOAD_ERR_OK) {
+    $allowed = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp'];
+    $mime    = mime_content_type($_FILES['id_card_photo']['tmp_name']);
+    if (isset($allowed[$mime])) {
+        $ext  = $allowed[$mime];
+        $dest = realpath(__DIR__ . '/../Src')
+                . "/idcard_{$userId}_" . time() . ".{$ext}";
+        if (move_uploaded_file($_FILES['id_card_photo']['tmp_name'], $dest)) {
+            $idCardPath = "../Src/" . basename($dest);
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{Referral System}
+
+Each user is assigned a unique referral code (format: \texttt{FDxxxxxx}) at registration. The redemption handler applies the rewards and prevents double-use:
+
+\begin{lstlisting}[style=phpstyle, caption={Referral Code Redemption Handler}]
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['redeem_referral'])) {
+    $inputCode = strtoupper(trim($_POST['referral_input'] ?? ''));
+
+    if ($inputCode === $myReferralCode) {
+        $msg = 'You cannot use your own referral code.';
+    } elseif (!empty($refRow['referred_by'])) {
+        $msg = 'You have already used a referral code.';
+    } else {
+        $refOwner = $db->prepare(
+            "SELECT id FROM users WHERE referral_code = ?");
+        $refOwner->execute([$inputCode]);
+        $ownerRow = $refOwner->fetch(PDO::FETCH_ASSOC);
+        if (!$ownerRow) {
+            $msg = 'Invalid referral code.';
+        } else {
+            $ownerId = (int)$ownerRow['id'];
+            // Credit 10 TND to the referrer
+            $db->prepare("UPDATE users SET balance = balance + 10
+                          WHERE id = ?")->execute([$ownerId]);
+            $payments->addPayment($ownerId, 10,
+                "Referral bonus — new user joined with your code");
+            // Credit 5 TND welcome bonus to the new user
+            $db->prepare("UPDATE users SET balance = balance + 5,
+                          referred_by = ? WHERE id = ?")
+               ->execute([$ownerId, $uid]);
+            $payments->addPayment($uid, 5,
+                "Welcome bonus — referral code redeemed");
+            header('Location: payments.php?ref=1'); exit();
+        }
+    }
+}
+\end{lstlisting}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Web Application Implementation}
+
+\subsection{Dashboard (interface.php)}
+
+The dashboard page aggregates three data sources per request: available rides (with optional search filters), the user's upcoming bookings, and a count of completed rides. These are fetched via the \texttt{Ride} class and displayed as Bootstrap 5 card components.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{3.5cm}
+\textbf{[INSERT SCREENSHOT — PASSENGER DASHBOARD]}\\[0.3cm]
+\textit{Shows: sidebar navigation, stat cards (upcoming/completed), ride search form,}\\
+\textit{available ride cards with driver name, route, price, and Book button.}
+\vspace{3.5cm}}}
+\caption{Passenger Dashboard (Web Application)}
+\label{fig:web-dashboard}
+\end{figure}
+
+\subsection{Messaging System}
+
+The messaging module uses a two-table design: \texttt{conversations} (pairs of users, optionally tied to a ride) and \texttt{messages} (individual messages within a conversation). The \texttt{Messages} PHP class implements conversation retrieval with unread counts, message delivery, and read-state management. The web UI uses a CSS flexbox chat bubble layout with server-side rendering.
+
+\begin{lstlisting}[style=phpstyle, caption={Send Message Handler in messages.php}]
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && isset($_POST['action']) && $_POST['action'] === 'send') {
+    $convId = (int)($_POST['conv_id'] ?? 0);
+    $body   = trim($_POST['body']    ?? '');
+    // Security: verify the sender is a member of this conversation
+    if ($convId && $body && $msgSvc->isMember($convId, $userId)) {
+        $msgSvc->send($convId, $userId, $body);
+    }
+    header('Location: messages.php?conv=' . $convId);
+    exit();
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{3.5cm}
+\textbf{[INSERT SCREENSHOT — MESSAGES PAGE]}\\[0.3cm]
+\textit{Shows: conversation list panel (left), chat bubble area (right),}\\
+\textit{message input bar at the bottom.}
+\vspace{3.5cm}}}
+\caption{Messaging Interface (Web Application)}
+\label{fig:web-messages}
+\end{figure}
+
+\subsection{Payments and Referral Page}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{3.5cm}
+\textbf{[INSERT SCREENSHOT — PAYMENTS PAGE]}\\[0.3cm]
+\textit{Shows: balance card (gradient, TND), simulated top-up form, referral code box}\\
+\textit{with copy button and referral count, transaction history table.}
+\vspace{3.5cm}}}
+\caption{Payments and Referral Page (Web Application)}
+\label{fig:web-payments}
+\end{figure}
+
+\subsection{Admin Panel}
+
+The admin panel is visually isolated from the regular user interface through a distinct colour identity (dark navy with red accent). It provides:
+\begin{itemize}[noitemsep]
+    \item Platform statistics (total users, rides, bookings, revenue).
+    \item User management table (view, suspend, ban, delete).
+    \item Student and driver verification queue.
+    \item Complaint management with status tracking.
+    \item Organisation registration approvals.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering\vspace{3.5cm}
+\textbf{[INSERT SCREENSHOT — ADMIN PANEL]}\\[0.3cm]
+\textit{Shows: red ``Admin Console'' badge in sidebar, stat KPI cards,}\\
+\textit{user management table with action buttons.}
+\vspace{3.5cm}}}
+\caption{Administrative Control Panel (Web Application)}
+\label{fig:web-admin}
+\end{figure}
+
+\subsection{Face Detection on Profile Photo Upload}
+
+During registration (and in settings), profile photo upload triggers a client-side face detection routine using the \texttt{face-api.js} library's TinyFaceDetector model. The model weights are loaded asynchronously from a CDN; if unavailable (offline), the check is gracefully bypassed.
+
+\begin{lstlisting}[language=Java, style=dartstyle, caption={Client-Side Face Detection (face-api.js)}]
+document.getElementById('photoInput').addEventListener('change', async function() {
+    const file   = this.files[0];
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        preview.src = e.target.result;
+        await loadFaceApi(); // loads TinyFaceDetector weights once
+
+        const img = document.createElement('img');
+        img.src   = e.target.result;
+        await new Promise(r => { img.onload = r; });
+
+        const detections = await faceapi.detectAllFaces(
+            img, new faceapi.TinyFaceDetectorOptions());
+
+        if (detections.length === 1)
+            status.innerHTML = '<span class="text-success">Face detected — looks good!</span>';
+        else if (detections.length === 0)
+            status.innerHTML = '<span class="text-warning">No face detected — use a clear photo.</span>';
+        else
+            status.innerHTML = '<span class="text-warning">Multiple faces — please use a solo photo.</span>';
+    };
+    reader.readAsDataURL(file);
+});
+\end{lstlisting}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Mobile Application Implementation}
+
+\subsection{Project Structure}
+
+\begin{lstlisting}[basicstyle=\ttfamily\small, numbers=none, frame=none, caption={Flutter Project Structure}]
+forsadrive_mobile/
+├── lib/
+│   ├── main.dart              # App entry point, router setup
+│   ├── core/
+│   │   ├── api/
+│   │   │   ├── api_client.dart    # Dio singleton + interceptors
+│   │   │   └── endpoints.dart     # URL constants
+│   │   ├── auth/
+│   │   │   └── auth_provider.dart # Login state + JWT token mgmt
+│   │   └── models/
+│   │       ├── user.dart
+│   │       ├── ride.dart
+│   │       └── booking.dart
+│   ├── features/
+│   │   ├── auth/
+│   │   │   ├── login_screen.dart
+│   │   │   └── register_screen.dart
+│   │   ├── rides/
+│   │   │   ├── ride_search_screen.dart
+│   │   │   ├── ride_detail_screen.dart
+│   │   │   └── my_rides_screen.dart
+│   │   ├── driver/
+│   │   │   ├── create_ride_screen.dart
+│   │   │   └── booking_requests_screen.dart
+│   │   ├── messages/
+│   │   │   └── chat_screen.dart
+│   │   └── profile/
+│   │       └── profile_screen.dart
+│   └── shared/
+│       ├── widgets/           # RideCard, AvatarWidget, LoadingOverlay
+│       └── theme.dart         # Colour constants, text styles
+├── assets/
+│   └── images/
+└── pubspec.yaml
+\end{lstlisting}
+
+\subsection{Authentication Flow}
+
+The mobile app authenticates via a \texttt{POST /api/auth/login} endpoint. On success, the server returns a JWT token which is stored in the device keychain via \texttt{flutter\_secure\_storage}. The \texttt{AuthProvider} \texttt{ChangeNotifier} exposes the authentication state to the widget tree, and the Dio interceptor automatically attaches the Bearer token to every subsequent request.
+
+\begin{lstlisting}[style=dartstyle, caption={Dio Interceptor for JWT Auth Token Injection}]
+class AuthInterceptor extends Interceptor {
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  @override
+  Future<void> onRequest(
+      RequestOptions options, RequestInterceptorHandler handler) async {
+    final token = await _storage.read(key: 'jwt_token');
+    if (token != null) {
+      options.headers['Authorization'] = 'Bearer $token';
+    }
+    handler.next(options);
+  }
+}
+\end{lstlisting}
+
+\subsection{Ride Search Screen}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.32\textwidth}
+\centering
+\fbox{\parbox{\textwidth}{\centering\vspace{6cm}
+\textbf{[Mobile Screenshot]}\\[0.2cm]
+\textit{Login Screen}
+\vspace{6cm}}}
+\caption{Login Screen}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.32\textwidth}
+\centering
+\fbox{\parbox{\textwidth}{\centering\vspace{6cm}
+\textbf{[Mobile Screenshot]}\\[0.2cm]
+\textit{Ride Search Results}
+\vspace{6cm}}}
+\caption{Ride Search}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.32\textwidth}
+\centering
+\fbox{\parbox{\textwidth}{\centering\vspace{6cm}
+\textbf{[Mobile Screenshot]}\\[0.2cm]
+\textit{Ride Details \& Book}
+\vspace{6cm}}}
+\caption{Ride Detail}
+\end{subfigure}
+\caption{Flutter Mobile Application — Key Screens}
+\label{fig:mobile-screens}
+\end{figure}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Integration Between Web and Mobile}
+
+Both platforms share the same SQLite database through the PHP backend. Web pages are served as HTML (server-side rendered), while the mobile app communicates with the same PHP codebase via JSON REST endpoints at \texttt{/api/}. Business logic (e.g. discount calculation, referral rules, booking validation) is implemented once in PHP and is therefore consistent across both clients.
+
+The key integration challenge is ensuring that data written by one client is immediately visible to the other. Since both clients hit the same database through the same PHP layer, this consistency is guaranteed at the data layer.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Technical Challenges and Solutions}
+
+\begin{table}[H]
+\centering
+\caption{Technical Challenges Encountered and Resolutions}
+\label{tab:challenges}
+\begin{tabularx}{\textwidth}{l X X}
+\toprule
+\textbf{Challenge} & \textbf{Description} & \textbf{Resolution} \\
+\midrule
+CAPTCHA always failing & CAPTCHA values were regenerated at the top of the POST handler before validation could read them & Moved CAPTCHA generation to GET-only; regeneration occurs after validation \\
+Profile picture not showing & Session stored stale picture path; settings upload did not sync the session & Sidebar now reads picture from DB on every load; session explicitly updated after upload \\
+vehicles schema mismatch & vehicles table was created with only 4 columns; signup tried to INSERT 13 & Added all missing columns via \texttt{ALTER TABLE} migration \\
+SQLite FK enforcement & SQLite FK constraints are disabled by default & Added \texttt{PRAGMA foreign\_keys=ON} at connection time \\
+Admin page on mobile & CSS hid sidebar on mobile with \texttt{display:none} & Added a mobile-specific topbar with hamburger and slide-in overlay \\
+\gls{xss} in chat & Message bodies were rendered without encoding & All output wrapped in \texttt{htmlspecialchars()} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section*{Chapter Conclusion}
+
+This chapter has presented the implementation of ForsaDrive across both platforms, highlighting key technical decisions and demonstrating the resolution of significant implementation challenges. The next chapter evaluates the system through a structured testing and validation process.
+
+%=============================================================================
+%  CHAPTER 7 — TESTING, VALIDATION, AND DEPLOYMENT
+%=============================================================================
+\chapter{Testing, Validation, and Deployment}
+
+\section*{Chapter Introduction}
+This chapter describes the testing strategy applied to ForsaDrive, presents the results of functional, security, and compatibility testing, maps test outcomes to requirements, and outlines the deployment process.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Testing Strategy}
+
+A multi-level testing strategy was adopted:
+
+\begin{enumerate}[noitemsep]
+    \item \textbf{Unit testing:} Individual class methods (User, Ride, Payments) were tested in isolation with targeted test inputs.
+    \item \textbf{Integration testing:} Page-level tests verified that controller logic, model methods, and database interactions produced correct end-to-end behaviour.
+    \item \textbf{Functional testing:} Systematic test cases, derived from the functional requirements in Chapter~3, were executed manually and documented in a test log.
+    \item \textbf{Security testing:} Targeted probing of known vulnerability categories (\gls{xss}, SQL injection, CSRF, broken access control).
+    \item \textbf{Compatibility testing:} Web application tested on multiple browsers; mobile application tested on Android emulator and physical device.
+    \item \textbf{User acceptance testing:} A selection of representative users performed scripted scenarios on both platforms and provided feedback.
+\end{enumerate}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Functional Test Cases}
+
+\begin{longtable}{p{0.8cm} p{3.5cm} p{4cm} p{3cm} c}
+\caption{Functional Test Cases and Results}\label{tab:test-cases}\\
+\toprule
+\textbf{ID} & \textbf{Test Case} & \textbf{Input / Action} & \textbf{Expected Result} & \textbf{Status} \\
+\midrule
+\endfirsthead
+\multicolumn{5}{c}{\tablename\ \thetable\ --- continued}\\
+\toprule
+\textbf{ID} & \textbf{Test Case} & \textbf{Input / Action} & \textbf{Expected Result} & \textbf{Status} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+TC01 & Register as Passenger & Valid form data (all fields) & Redirect to login; new user in DB & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC02 & Register — wrong CAPTCHA & Correct form + wrong CAPTCHA answer & Error message; form retained & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC03 & Register — duplicate email & Email already in DB & Error: email already taken & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC04 & Register as Driver — no carte grise & Driver registration without ID card photo & Frontend validation blocks submission & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC05 & Login — correct credentials & Valid email + password & Redirect to dashboard & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC06 & Login — wrong password & Valid email + wrong password & Error message; no session created & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC07 & Search rides & Origin: Tunis, Dest: Sfax & Matching rides displayed & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC08 & Book ride — sufficient balance & Ride with price < user balance & Booking created; balance deducted & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC09 & Book ride — insufficient balance & Ride with price > user balance & Error; redirect to payments & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC10 & Cancel booking & Cancel a confirmed booking & Booking cancelled; balance refunded & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC11 & Simulate top-up & Amount: 20 TND & Balance += 20; transaction recorded & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC12 & Referral — valid code & Enter another user's code & +5 TND self, +10 TND referrer & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC13 & Referral — own code & Enter own referral code & Error: cannot use own code & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC14 & Referral — double redemption & Re-enter a code after already redeeming one & Error: already redeemed & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC15 & Send message & Type and submit a message & Message appears in chat & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC16 & Submit rating & Rate driver after completed ride & Rating saved; driver avg updated & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC17 & Submit complaint & Fill complaint form & Complaint stored; status: open & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC18 & Upload profile photo & Select JPEG image & Photo saved; shown in sidebar & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC19 & Upload invalid file type & Select .exe file & Error: invalid file type & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC20 & Admin: suspend user & Admin suspends a user account & User cannot log in & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC21 & Access admin without flag & Non-admin visits admin.php & Redirect to dashboard & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC22 & Student discount applied & Student books a 20 TND ride & Charged 10 TND (50\% off) & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC23 & Mobile login & Flutter app: login with valid credentials & JWT stored; home screen shown & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC24 & Mobile ride search & Search Tunis → Sousse on mobile & Results displayed as cards & \textcolor{green!70!black}{\textbf{PASS}} \\
+TC25 & Password change & Correct current + new password & Password updated & \textcolor{green!70!black}{\textbf{PASS}} \\
+\end{longtable}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Requirements Traceability Matrix}
+
+\begin{table}[H]
+\centering
+\caption{Requirements Traceability (Partial)}
+\label{tab:traceability}
+\begin{tabularx}{\textwidth}{l X c c}
+\toprule
+\textbf{Req.} & \textbf{Description (abbreviated)} & \textbf{Test(s)} & \textbf{Result} \\
+\midrule
+FR01 & User registration & TC01, TC02, TC03 & \textcolor{green!70!black}{\textbf{PASS}} \\
+FR02 & CAPTCHA on forms & TC02 & \textcolor{green!70!black}{\textbf{PASS}} \\
+FR06 & Carte grise required & TC04 & \textcolor{green!70!black}{\textbf{PASS}} \\
+FR09 & Book a ride & TC08, TC09 & \textcolor{green!70!black}{\textbf{PASS}} \\
+FR12 & Cancel and refund & TC10 & \textcolor{green!70!black}{\textbf{PASS}} \\
+FR15--16 & Referral system & TC12, TC13, TC14 & \textcolor{green!70!black}{\textbf{PASS}} \\
+FR17 & Messaging & TC15 & \textcolor{green!70!black}{\textbf{PASS}} \\
+FR21 & Admin panel & TC20, TC21 & \textcolor{green!70!black}{\textbf{PASS}} \\
+FR23 & Student discount & TC22 & \textcolor{green!70!black}{\textbf{PASS}} \\
+FR25 & Mobile core workflows & TC23, TC24 & \textcolor{green!70!black}{\textbf{PASS}} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Security Testing}
+
+\begin{table}[H]
+\centering
+\caption{Security Test Results}
+\label{tab:security-tests}
+\begin{tabularx}{\textwidth}{l X c}
+\toprule
+\textbf{Vulnerability} & \textbf{Test Performed} & \textbf{Result} \\
+\midrule
+SQL Injection & Injected \texttt{'OR 1=1--} in login email field & \textcolor{green!70!black}{\textbf{Blocked}} (PDO prepared statements) \\
+\gls{xss} (stored) & Injected \texttt{<script>alert(1)</script>} in message body & \textcolor{green!70!black}{\textbf{Blocked}} (\texttt{htmlspecialchars} on output) \\
+\gls{xss} (reflected) & Injected JS in URL parameters displayed on page & \textcolor{green!70!black}{\textbf{Blocked}} \\
+Broken Access Control & Directly accessed \texttt{admin.php} without admin flag & \textcolor{green!70!black}{\textbf{Redirected}} to dashboard \\
+IDOR (bookings) & Attempted to cancel another user's booking via POST & \textcolor{green!70!black}{\textbf{Blocked}} (ownership check) \\
+File upload bypass & Uploaded PHP file renamed as \texttt{.jpg} & \textcolor{green!70!black}{\textbf{Blocked}} (\texttt{mime\_content\_type} check) \\
+Password storage & Inspected DB for plaintext passwords & \textcolor{green!70!black}{\textbf{Hashed}} (bcrypt) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Compatibility Testing}
+
+\begin{table}[H]
+\centering
+\caption{Browser and Device Compatibility}
+\label{tab:compat}
+\begin{tabularx}{\textwidth}{l l l c}
+\toprule
+\textbf{Platform} & \textbf{Browser / Device} & \textbf{Resolution} & \textbf{Result} \\
+\midrule
+Desktop & Chrome 124 & 1920×1080 & \textcolor{green!70!black}{\textbf{PASS}} \\
+Desktop & Firefox 125 & 1920×1080 & \textcolor{green!70!black}{\textbf{PASS}} \\
+Desktop & Edge 124 & 1920×1080 & \textcolor{green!70!black}{\textbf{PASS}} \\
+Tablet  & Chrome (iPad sim.) & 768×1024 & \textcolor{green!70!black}{\textbf{PASS}} \\
+Mobile  & Chrome (Android sim.) & 375×812 & \textcolor{green!70!black}{\textbf{PASS}} \\
+Mobile app & Android emulator (API 33) & 393×851 & \textcolor{green!70!black}{\textbf{PASS}} \\
+Mobile app & Physical Android device & 1080×2340 & \textcolor{green!70!black}{\textbf{PASS}} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Deployment Process}
+
+\subsection{Web Application}
+
+For production deployment, the following process is recommended:
+
+\begin{enumerate}[noitemsep]
+    \item Provision a VPS or shared hosting running Ubuntu 22.04+ with Apache2 and PHP 8.2.
+    \item Migrate the SQLite database to MySQL 8.0 or PostgreSQL 15 by updating the PDO DSN in \texttt{config.php} and running the schema migration script.
+    \item Configure Apache virtual host to point to the ForsaDrive project root.
+    \item Enable \gls{https} via Let's Encrypt / Certbot.
+    \item Set \texttt{display\_errors = Off} and configure a dedicated error log.
+    \item Set appropriate file permissions on the \texttt{Src/} and \texttt{Database/} directories.
+    \item Integrate a real payment gateway (Flouci or Konnect) by implementing their PHP SDK in \texttt{Pages/payments.php}.
+\end{enumerate}
+
+\subsection{Mobile Application}
+
+\begin{enumerate}[noitemsep]
+    \item Update the API base URL constant in \texttt{lib/core/api/endpoints.dart} to point to the production server.
+    \item Build the Android APK/AAB: \texttt{flutter build apk -{}-release}.
+    \item Sign the release APK with the production keystore.
+    \item Upload to Google Play Console (or distribute via direct APK for testing).
+    \item For iOS: build via Xcode (\texttt{flutter build ios}) and submit to App Store Connect.
+\end{enumerate}
+
+\subsection{Current Deployment Status}
+
+During the project period, ForsaDrive was deployed and validated exclusively on a local development environment (LAMPP stack). The system was verified to function correctly in this environment across all tested browsers and devices. Production deployment is planned as part of the post-PFE phase.
+
+\section*{Chapter Conclusion}
+
+All 25 functional test cases passed. Security testing confirmed that the system is protected against the most common web vulnerabilities. Compatibility was verified across all major browsers and on Android. The deployment process for both the web and mobile applications has been documented for the production release phase.
+
+%=============================================================================
+%  CHAPTER 8 — GENERAL CONCLUSION AND FUTURE WORK
+%=============================================================================
+\chapter{General Conclusion and Future Work}
+
+\section*{Chapter Introduction}
+This final chapter summarises the work accomplished, reflects on the contributions and limitations of the project, and presents a roadmap of improvements and extensions for future development.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Summary of Achievements}
+
+This project set out to design, implement, and validate ForsaDrive, an integrated ride-sharing platform tailored to the Tunisian market. The following objectives were fully achieved:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Dual-platform delivery (O1):} A complete web application and a functional Flutter mobile application were both implemented and tested.
+    \item \textbf{Core ride-sharing workflow (O2):} Users can publish, search, book, accept/reject, and complete rides with a full lifecycle.
+    \item \textbf{Driver verification (O3):} Vehicle carte grise upload is enforced at driver registration and stored securely.
+    \item \textbf{In-app wallet (O4):} A simulated wallet top-up mechanism with full transaction history is operational.
+    \item \textbf{Referral programme (O5):} Unique per-user referral codes with 10\,TND/5\,TND rewards are fully implemented.
+    \item \textbf{Messaging (O6):} Real-time-ish peer-to-peer messaging via conversation threads is functional on both platforms.
+    \item \textbf{Security (O7):} All identified vulnerabilities (XSS, SQL injection, broken access control, file upload) were addressed.
+    \item \textbf{Admin control (O8):} A fully-featured administrative panel is accessible to authorised users.
+    \item \textbf{Tunisia localisation (O9):} All 24 Tunisian governorates are supported; the platform is Tunisia-only (TND currency); French and Arabic language infrastructure is in place.
+\end{itemize}
+
+The project was delivered on schedule across four Scrum sprints and was validated against a comprehensive set of functional, security, and compatibility tests.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Contributions}
+
+The principal technical contributions of this project are:
+
+\begin{enumerate}[noitemsep]
+    \item A dual-platform architecture design (PHP web + Flutter mobile) sharing a single backend, providing a reusable blueprint for similar projects in the regional context.
+    \item A Tunisia-specific carpooling platform with governorate-based geographic resolution, TND-denominated payments, and local vehicle identification document upload.
+    \item A complete, production-ready referral incentive system integrated with the in-app wallet.
+    \item A client-side face detection integration (face-api.js TinyFaceDetector) for profile photo quality enforcement without server-side processing cost.
+    \item A documented, extensible codebase with a database abstraction layer designed to facilitate migration from SQLite to a production-grade RDBMS.
+\end{enumerate}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Limitations}
+
+The following limitations of the current implementation are acknowledged:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Simulated payments:} Real Tunisian payment gateway integration (Flouci, Konnect) was not implemented due to API access and registration requirements outside the scope of the academic project.
+    \item \textbf{SQLite concurrency:} SQLite's write serialisation makes it unsuitable for a production system with many concurrent users. Migration to MySQL or PostgreSQL is required before launch.
+    \item \textbf{Real-time messaging:} The current messaging implementation uses polling via page reload rather than WebSockets or Server-Sent Events. True real-time delivery was not implemented.
+    \item \textbf{Email notifications:} The notification system is in-app only. Email notifications (booking confirmation, password reset) were designed but not integrated with an SMTP service.
+    \item \textbf{Identity verification:} Driver carte grise upload is collected but not automatically verified. An automated OCR-based verification step is missing.
+    \item \textbf{Mobile feature completeness:} The mobile application covers the core ride-sharing flows but does not yet implement payments, referrals, or admin features.
+\end{itemize}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Future Improvements}
+
+\begin{table}[H]
+\centering
+\caption{Planned Future Improvements}
+\label{tab:future}
+\begin{tabularx}{\textwidth}{l X c}
+\toprule
+\textbf{Area} & \textbf{Improvement} & \textbf{Priority} \\
+\midrule
+Payments & Integrate Flouci or Konnect Tunisian payment gateway & High \\
+Database & Migrate from SQLite to MySQL/PostgreSQL for production & High \\
+Messaging & Implement WebSocket-based real-time messaging & High \\
+Mobile & Complete payments, referral, and notification features on mobile & High \\
+Verification & OCR-based automatic carte grise document validation & Medium \\
+Notifications & Email/SMS notifications via SMTP / Twilio & Medium \\
+Maps & Real-time route visualisation and estimated travel duration & Medium \\
+Analytics & Driver earnings dashboard with charts and export & Medium \\
+AI & Ride recommendation engine based on booking history & Low \\
+Compliance & GDPR-compatible data export and deletion workflows & Low \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Closing Remarks}
+
+ForsaDrive demonstrates that a functional, secure, and locally-adapted ride-sharing platform for Tunisia can be built by a two-person team with off-the-shelf open-source technologies within a limited academic timeline. The project has provided both authors with deep, practical experience in full-stack web development, mobile application engineering, database design, security engineering, and project management.
+
+We believe ForsaDrive, with the integration of real payment gateways, production database infrastructure, and real-time communication, has the potential to be deployed as a genuine service that could benefit thousands of Tunisian commuters.
+
+\vspace{1cm}
+\begin{flushright}
+\textit{Youssef Ben Abid \& Anas Younes}\\
+\textit{[City], [Month] 2025}
+\end{flushright}
+
+%=============================================================================
+%  REFERENCES
+%=============================================================================
+\cleardoublepage
+\printbibliography[heading=bibintoc, title={References}]
+
+%=============================================================================
+%  APPENDICES
+%=============================================================================
+\cleardoublepage
+\appendix
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{fdnavy}}
+  {Appendix\ \thechapter}
+  {20pt}
+  {\Huge}
+
+%─────────────────────────────────────────────────────────────────────────────
+\chapter{Database Creation Script}
+\label{app:db-script}
+
+The following excerpt shows the key table creation statements from \texttt{setup\_db.php}. The full script is available in the project repository.
+
+\begin{lstlisting}[style=sqlstyle, caption={Users and Vehicles Table DDL}]
+CREATE TABLE IF NOT EXISTS users (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    username     TEXT NOT NULL UNIQUE,
+    email        TEXT NOT NULL UNIQUE,
+    password     TEXT NOT NULL,
+    Region       TEXT NOT NULL DEFAULT 'TN',
+    is_driver    BOOLEAN DEFAULT 0,
+    is_student   BOOLEAN DEFAULT 0,
+    is_admin     INTEGER DEFAULT 0,
+    balance      REAL DEFAULT 0,
+    picture      TEXT DEFAULT '../Src/default.jpg',
+    score        REAL DEFAULT 5.0,
+    phone        TEXT,
+    bio          TEXT,
+    governorate  TEXT,
+    municipality TEXT,
+    address      TEXT,
+    date_of_birth DATE,
+    gender       TEXT,
+    suspended    INTEGER DEFAULT 0,
+    ban_reason   TEXT,
+    referral_code    TEXT,
+    referred_by      INTEGER REFERENCES users(id),
+    is_helpdesk_agent INTEGER DEFAULT 0,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS vehicles (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL REFERENCES users(id),
+    type          TEXT NOT NULL,
+    make          TEXT,
+    model         TEXT,
+    year          INTEGER,
+    color         TEXT,
+    seats         INTEGER NOT NULL,
+    plate_number  TEXT UNIQUE,
+    has_ac        INTEGER DEFAULT 0,
+    luggage       TEXT DEFAULT 'none',
+    max_weight_kg REAL,
+    photo         TEXT,
+    id_card_photo TEXT,       -- carte grise photograph
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+\end{lstlisting}
+
+%─────────────────────────────────────────────────────────────────────────────
+\chapter{PlantUML Use Case Diagram Source}
+\label{app:plantuml}
+
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize, numbers=none,
+    caption={PlantUML Source for Global Use Case Diagram}]
+@startuml ForsaDrive_UseCases
+left to right direction
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+
+actor "Guest"          as Guest
+actor "Passenger"      as Passenger
+actor "Driver"         as Driver
+actor "Student"        as Student
+actor "Organisation"   as Org
+actor "Helpdesk Agent" as Agent
+actor "Admin"          as Admin
+actor "System"         as SYS
+
+' Generalisations
+Passenger  -|> Guest
+Driver     -|> Passenger
+Student    -|> Passenger
+Agent      -|> Passenger
+
+package "Authentication" {
+  (Register)
+  (Login)
+  (Logout)
+  (Reset Password)
+}
+
+package "Ride Management" {
+  (Publish Ride)
+  (Search Rides)
+  (Book Ride)
+  (Cancel Booking)
+  (Accept Booking)
+  (Reject Booking)
+  (Complete Ride)
+}
+
+package "Payments & Wallet" {
+  (View Balance)
+  (Top-Up Wallet)
+  (Redeem Referral Code)
+  (View Transaction History)
+}
+
+package "Communication" {
+  (Send Message)
+  (View Messages)
+  (Contact Helpdesk)
+}
+
+package "Ratings & Feedback" {
+  (Rate Ride)
+  (Submit Complaint)
+  (View Ratings)
+}
+
+package "Administration" {
+  (Manage Users)
+  (Handle Complaints)
+  (Verify Drivers)
+  (View Statistics)
+}
+
+' Actor → Use Case links
+Guest     --> (Register)
+Guest     --> (Login)
+Passenger --> (Search Rides)
+Passenger --> (Book Ride)
+Passenger --> (Cancel Booking)
+Passenger --> (View Balance)
+Passenger --> (Top-Up Wallet)
+Passenger --> (Redeem Referral Code)
+Passenger --> (Send Message)
+Passenger --> (Rate Ride)
+Passenger --> (Submit Complaint)
+Passenger --> (Contact Helpdesk)
+Driver    --> (Publish Ride)
+Driver    --> (Accept Booking)
+Driver    --> (Reject Booking)
+Driver    --> (Complete Ride)
+Org       --> (Register)
+Agent     --> (Contact Helpdesk)
+Admin     --> (Manage Users)
+Admin     --> (Handle Complaints)
+Admin     --> (Verify Drivers)
+Admin     --> (View Statistics)
+SYS       --> (Reset Password)
+
+@enduml
+\end{lstlisting}
+
+%─────────────────────────────────────────────────────────────────────────────
+\chapter{REST API Endpoint Reference}
+\label{app:api}
+
+\begin{table}[H]
+\centering
+\caption{REST API Endpoints (Mobile)}
+\label{tab:api-endpoints}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Method} & \textbf{Endpoint} & \textbf{Description} \\
+\midrule
+POST & \texttt{/api/auth/login}    & Authenticate user, return JWT token \\
+POST & \texttt{/api/auth/register} & Register new user \\
+GET  & \texttt{/api/auth/me}       & Get current authenticated user profile \\
+GET  & \texttt{/api/rides}         & Search rides (query: from, to, date, seats) \\
+POST & \texttt{/api/rides}         & Create a new ride (driver only) \\
+GET  & \texttt{/api/rides/\{id\}}  & Get ride details \\
+POST & \texttt{/api/bookings}      & Book a ride \\
+GET  & \texttt{/api/bookings/me}   & Get user's bookings \\
+PATCH & \texttt{/api/bookings/\{id\}/cancel} & Cancel a booking \\
+GET  & \texttt{/api/wallet}        & Get wallet balance and transactions \\
+GET  & \texttt{/api/messages}      & Get conversations \\
+GET  & \texttt{/api/messages/\{convId\}} & Get messages in a conversation \\
+POST & \texttt{/api/messages}      & Send a message \\
+GET  & \texttt{/api/notifications} & Get user notifications \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+All endpoints except \texttt{/api/auth/login} and \texttt{/api/auth/register} require an \texttt{Authorization: Bearer <token>} header.
+
+%─────────────────────────────────────────────────────────────────────────────
+\chapter{User Manual Excerpts}
+\label{app:user-manual}
+
+\section*{How to Register as a Driver}
+
+\begin{enumerate}[noitemsep]
+    \item Navigate to \texttt{/Pages/signup.php} and click \textbf{Sign Up Free}.
+    \item \textbf{Step 1 — Personal Info:} Enter your full name, email address, date of birth (must be 18+), phone number, and create a password. Answer the security question (CAPTCHA).
+    \item \textbf{Step 2 — Location:} Select your governorate from the dropdown. The municipality list will update automatically.
+    \item \textbf{Step 3 — Account Setup:} Click the \textbf{Driver} role card. The vehicle information form will appear.
+    \begin{itemize}[noitemsep]
+        \item Fill in: vehicle type, make, model, year, colour, plate number (matricule), number of seats.
+        \item Upload a photograph of your vehicle (optional).
+        \item Upload a photograph of your vehicle registration card (carte grise) --- \textit{required}.
+    \end{itemize}
+    \item Click \textbf{Create Account}. You will be redirected to the login page.
+\end{enumerate}
+
+\section*{How to Redeem a Referral Code}
+
+\begin{enumerate}[noitemsep]
+    \item Log in and navigate to \textbf{Payments} from the sidebar.
+    \item Under the \textbf{Referral Programme} card, locate the \textbf{Enter a Friend's Code} field.
+    \item Type the referral code (format: \texttt{FDxxxxxx}) and click \textbf{Redeem}.
+    \item If valid, 5\,TND will be credited to your wallet and 10\,TND to your referrer's wallet.
+    \item Each account may redeem a referral code only once.
+\end{enumerate}
+
+%=============================================================================
+\end{document}

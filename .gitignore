@@ -1,0 +1,29 @@
+# ── Web (PHP / XAMPP) ─────────────────────────────────────────────────────────
+web/vendor/
+web/Database/DB.db
+web/Database/DB.db-wal
+web/Database/DB.db-shm
+web/.env
+
+# ── Mobile (Flutter) ──────────────────────────────────────────────────────────
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/google-services.json
+mobile/ios/.symlinks/
+mobile/ios/Pods/
+mobile/ios/Flutter/Flutter.framework
+mobile/ios/Flutter/Flutter.podspec
+mobile/coverage/
+mobile/*.g.dart
+mobile/**/*.g.dart
+
+# ── General ───────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+node_modules/
