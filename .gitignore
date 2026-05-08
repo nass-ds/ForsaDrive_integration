@@ -1,0 +1,26 @@
+# Node / API
+node_modules/
+.env
+.env.local
+dist/
+build/
+coverage/
+
+# Flutter
+forsa_drive_flutter/.dart_tool/
+forsa_drive_flutter/build/
+forsa_drive_flutter/.flutter-plugins
+forsa_drive_flutter/.flutter-plugins-dependencies
+forsa_drive_flutter/.packages
+forsa_drive_flutter/pubspec.lock
+
+# Android / Flutter generated
+forsa_drive_flutter/android/.gradle/
+forsa_drive_flutter/android/app/build/
+
+# IDE / OS
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
