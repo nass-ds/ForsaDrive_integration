@@ -1,0 +1,305 @@
+%=============================================================================
+%  CHAPTER 3 — CONCEPTION
+%=============================================================================
+% Required packages (add to your main preamble if not already present):
+%   \usepackage{float}
+%   \usepackage{enumitem}
+%   \usepackage{tikz}
+%   \usetikzlibrary{positioning, shapes.geometric, arrows.meta}
+%   \usepackage{graphicx}
+%   % Optional, if you want a landscape page for the class diagram:
+%   % \usepackage{pdflscape}
+%=============================================================================
+
+\chapter{Conception}
+
+\clearpage
+\section*{Introduction}
+
+Once the requirements of a platform have been clarified, the conception phase becomes the bridge between what the system should do and how it will actually be built. This chapter presents the conception of ForsaDrive at progressively finer levels of detail. It opens with the general software architecture, then refines the most representative use cases identified in the previous chapter, illustrates the dynamic behavior of the system through sequence and activity diagrams, and finally describes the structural backbone of the application by means of a class diagram and a relational schema. Throughout the chapter, the modeling choices are justified in light of the constraints of the Tunisian context: a user base that is more comfortable with mobile devices than with web browsers, payments that are still partly handled in cash, and a market in which trust between drivers and passengers must be built feature by feature.
+
+
+\section{General Architecture}
+
+\subsection{Client--Server Architecture}
+
+ForsaDrive is organized around a classic client--server architecture. A unified REST API is exposed by a backend server and is consumed by two distinct clients: a web application targeted at administrators and at desktop users, and a mobile application that covers the daily usage of drivers and passengers. This separation has two main benefits. It allows the two interfaces to evolve at their own pace, as long as the API contract remains stable, and it avoids duplicating the business logic on the client side, where it would be both harder to maintain and easier to bypass. External services such as the payment gateway, the notification service, and the file storage that hosts student identity documents are reached exclusively through the backend, so that no sensitive credential is ever exposed on a client device.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        every node/.style={font=\small},
+        client/.style={draw, rounded corners, minimum width=2.6cm, minimum height=1cm, fill=blue!10, thick, align=center},
+        server/.style={draw, rounded corners, minimum width=3.2cm, minimum height=1.3cm, fill=orange!25, thick, align=center},
+        db/.style={draw, minimum width=2.2cm, minimum height=1.3cm, fill=green!15, thick, align=center},
+        ext/.style={draw, rounded corners, minimum width=2.4cm, minimum height=0.9cm, fill=gray!15, thick, align=center}
+    ]
+        % Clients
+        \node[client] (web)    at (0,  1.3) {Web\\ Application};
+        \node[client] (mobile) at (0, -1.3) {Mobile\\ Application};
+
+        % Backend
+        \node[server] (api) at (5.5, 0) {Backend\\ (REST API)};
+
+        % Database
+        \node[db] (db) at (10.5, 0) {Database};
+
+        % External services
+        \node[ext] (notif) at (2.5, -3.5) {Notification\\ Service};
+        \node[ext] (pay)   at (5.5, -3.5) {Payment\\ Service};
+        \node[ext] (store) at (8.5, -3.5) {File\\ Storage};
+
+        % Arrows
+        \draw[->, thick] (web)        -- (api) node[midway, above, sloped] {\scriptsize HTTPS / REST};
+        \draw[->, thick] (mobile)     -- (api) node[midway, below, sloped] {\scriptsize HTTPS / REST};
+        \draw[->, thick] (api)        -- (db);
+        \draw[->, thick] (api.south)  -- (notif.north);
+        \draw[->, thick] (api.south)  -- (pay.north);
+        \draw[->, thick] (api.south)  -- (store.north);
+    \end{tikzpicture}
+    \caption{Client--server architecture of ForsaDrive}
+    \label{fig:client_server_architecture}
+\end{figure}
+
+\subsection{Three-Tier Organization}
+
+Internally, the backend follows a three-tier organization that separates presentation, business logic, and data persistence. This decomposition reflects a deliberate effort to isolate the parts of the system that change at different rhythms: the presentation tier evolves with the user interface, the application tier with the business rules, and the data tier with the persistence model.
+
+\begin{description}[noitemsep]
+    \item[Presentation tier.] Composed of the web and mobile applications, this layer is responsible for user interaction, form validation on the client side, and rendering. It never accesses the database directly and only communicates with the application tier through the REST API.
+    \item[Application tier.] Contains the business rules of ForsaDrive: route publication, booking logic, prepayment computation, application of the student discount, ride lifecycle, ratings and reliability scoring, and complaint handling. It is exposed through a REST API secured by JSON Web Tokens.
+    \item[Data tier.] Stores persistent information such as users, routes, bookings, payments, ratings, and messages. It is accessed exclusively through the application tier, which guarantees the integrity of the business rules at all times.
+\end{description}
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        every node/.style={font=\small, align=center},
+        tier/.style={draw, rounded corners, minimum width=11cm, minimum height=1.6cm, thick}
+    ]
+        \node[tier, fill=blue!10]   (pres) at (0, 4) {\textbf{Presentation Tier}\\ Web Application \;\;|\;\; Mobile Application};
+        \node[tier, fill=orange!20] (app)  at (0, 2) {\textbf{Application Tier}\\ REST API \;\;|\;\; Business Logic \;\;|\;\; Authentication (JWT)};
+        \node[tier, fill=green!15]  (data) at (0, 0) {\textbf{Data Tier}\\ Relational Database \;\;|\;\; File Storage};
+
+        \draw[<->, thick] (pres) -- (app);
+        \draw[<->, thick] (app)  -- (data);
+    \end{tikzpicture}
+    \caption{Three-tier organization of the platform}
+    \label{fig:three_tier_architecture}
+\end{figure}
+
+\subsection{External Services}
+
+In addition to its own three tiers, the backend interacts with three external building blocks. The \textbf{payment service} processes the fifty-percent prepayment that confirms a booking; in the first version of ForsaDrive, this service is simulated, but the architecture is designed so that it can be replaced by a real provider without any impact on the rest of the code. The \textbf{notification service} delivers booking, payment, and message alerts to drivers and passengers, both through push notifications on the mobile application and through email when relevant. Finally, a dedicated \textbf{file storage} keeps student identity documents and profile pictures, so that the relational database is not polluted with binary content and so that documents can be served through short-lived signed URLs that protect them from unauthorized access.
+
+\subsection{Security Mechanisms}
+
+Authentication relies on signed tokens delivered after a successful login. Every protected endpoint validates the token, extracts the user identity, and checks the associated role before executing the requested operation. Passwords are hashed with a modern algorithm and are never stored or transmitted in clear. All communications go through HTTPS, and sensitive operations such as payment, account suspension, or student verification are logged on the server side for audit purposes. Identity documents stored in the file service are accessible only to authenticated administrators, through signed URLs that expire after a short delay. Together, these mechanisms reduce the attack surface of the platform and align its handling of personal data with the expectations of users entrusting their identity documents to the system.
+
+
+\section{Refinement of Use Cases}
+
+The global use case diagram of ForsaDrive, presented in Figure~\ref{fig:use_case_global}, regroups the functionalities of the platform around four actors -- the \textit{Passenger}, the \textit{Driver}, the \textit{Admin}, and the \textit{System} itself, the latter being responsible for automated operations such as discount calculation, reliability scoring, and notification dispatching. Each actor is restricted to a coherent set of use cases, and a few of them are connected through \texttt{<<include>>} or \texttt{<<extend>>} relationships when an operation must trigger an automated step or when a behavior is optional.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth, height=0.9\textheight, keepaspectratio]{ForsaDrive_UseCase.png}
+    \caption{Global use case diagram of ForsaDrive}
+    \label{fig:use_case_global}
+\end{figure}
+
+The most representative use cases are refined below in textual form, in order to expose their internal logic and the alternative scenarios that the system must handle.
+
+\subsection{Use Case: Publish a Route}
+
+\textbf{Actor:} Driver.\\
+\textbf{Precondition:} The driver is authenticated, the account is active, and a vehicle has been registered on the profile.\\
+\textbf{Main scenario:}
+\begin{enumerate}[noitemsep]
+    \item The driver selects the action of creating a new route.
+    \item The system displays the route creation form.
+    \item The driver fills in the origin, the destination, the departure date and time, the price per seat, and the number of available seats.
+    \item The driver confirms the creation.
+    \item The system validates the data, persists the route with the status \textit{ACTIVE}, and notifies the passengers whose saved searches match the new offer.
+\end{enumerate}
+\textbf{Alternative scenarios:}
+\begin{itemize}[noitemsep]
+    \item If a mandatory field is missing or invalid, the system displays an error message and the route is not created.
+    \item If the driver account is suspended, the system rejects the request with an explanatory message.
+    \item If no vehicle is registered yet, the driver is redirected to the vehicle registration page.
+\end{itemize}
+
+\subsection{Use Case: Book a Ride}
+
+\textbf{Actor:} Passenger.\\
+\textbf{Precondition:} The passenger is authenticated and at least one seat is available on the selected route.\\
+\textbf{Main scenario:}
+\begin{enumerate}[noitemsep]
+    \item The passenger searches for routes by entering origin, destination, and date.
+    \item The system returns the matching routes and applies the student discount on the displayed price if the passenger is a verified student.
+    \item The passenger opens the details of a route and selects the number of seats and, when available, a seat position.
+    \item The system computes the total amount and the fifty-percent prepayment.
+    \item The passenger confirms the booking and the prepayment.
+    \item The system processes the prepayment, registers the booking with the status \textit{PENDING}, and notifies the driver.
+\end{enumerate}
+\textbf{Alternative scenarios:}
+\begin{itemize}[noitemsep]
+    \item If the prepayment fails, the booking is not created and the passenger is invited to retry or to cancel.
+    \item If the seat becomes unavailable between the selection and the confirmation, the booking is rejected and the passenger is informed.
+    \item If the driver later refuses the booking, the prepayment is automatically refunded.
+\end{itemize}
+
+\subsection{Use Case: Verify Student Status via Email OTP}
+
+\textbf{Actor:} Passenger (Student).\\
+\textbf{Precondition:} The passenger is authenticated and possesses a valid university email address whose domain is listed in the platform's recognized domain table.\\
+\textbf{Main scenario:}
+\begin{enumerate}[noitemsep]
+    \item The passenger navigates to the student verification screen and enters a university email address.
+    \item The system checks the email domain against the \textit{student\_domains} table maintained by the administrator.
+    \item If the domain is recognized, the system generates a six-digit OTP, stores it with a ten-minute expiry, and dispatches it by email to the provided address.
+    \item The passenger enters the received code on the verification screen.
+    \item The system validates the code, marks the account as \textit{is\_student = true}, and records the verification event in the audit log.
+    \item The fifty-percent student discount is automatically applied to all future bookings from this account.
+\end{enumerate}
+\textbf{Alternative scenarios:}
+\begin{itemize}[noitemsep]
+    \item If the domain is not in the recognized list, the system rejects the request and shows the list of accepted university domains.
+    \item If the code has expired, the student is invited to request a new one.
+    \item After five consecutive incorrect attempts, the current code is invalidated and the student must request a new one.
+\end{itemize}
+
+\subsection{Use Case: Rate a Trip}
+
+\textbf{Actor:} Passenger or Driver.\\
+\textbf{Precondition:} The trip is marked as completed.\\
+\textbf{Main scenario:}
+\begin{enumerate}[noitemsep]
+    \item Once the trip is completed, the system invites both parties to rate each other.
+    \item The user selects a score between one and five and optionally writes a short comment.
+    \item The system stores the rating, updates the average score of the rated party, and recomputes the reliability score of the driver when applicable.
+\end{enumerate}
+
+
+\section{Sequence Diagrams}
+
+Sequence diagrams describe, over time, the messages exchanged between the actors and the components of the system for a specific scenario. Four critical scenarios of ForsaDrive are detailed below: the creation of a route by a driver, the booking of a ride by a passenger with prepayment, the self-service OTP-based student verification, and the driver registration review by an administrator.
+
+\subsection{Sequence Diagram: Driver Creates a Route}
+
+The diagram in Figure~\ref{fig:seq_create_route} shows how a driver publishes a new route. The frontend first performs a client-side validation in order to catch the most common mistakes early; the request is then sent to the backend, which checks the eligibility of the driver and the presence of a registered vehicle before persisting the route.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth, height=0.9\textheight, keepaspectratio]{ForsaDrive_Sequence_CreateRoute.png}
+    \caption{Sequence diagram of the publication of a route by a driver}
+    \label{fig:seq_create_route}
+\end{figure}
+
+\subsection{Sequence Diagram: Passenger Books a Ride}
+
+Figure~\ref{fig:seq_book_ride} highlights the interaction between the passenger, the application, the wallet, the notification service, and the database during a booking. The student discount is applied at the price computation step, before the prepayment of fifty percent is deducted from the wallet. The booking is only persisted if the deduction succeeds, which guarantees the commitment of the passenger and protects the driver from no-shows.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth, height=0.9\textheight, keepaspectratio]{ForsaDrive_Sequence_BookRide.png}
+    \caption{Sequence diagram of a booking with prepayment}
+    \label{fig:seq_book_ride}
+\end{figure}
+
+\subsection{Sequence Diagram: Student Email OTP Verification}
+
+Student verification was designed as a self-service flow that does not require any administrative intervention. The diagram in Figure~\ref{fig:seq_otp_verify} describes the two-step process: the student submits a university email address, the system checks the domain against the managed whitelist, sends a six-digit OTP, and grants the student status once the correct code is entered within the ten-minute validity window.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth, height=0.9\textheight, keepaspectratio]{ForsaDrive_Sequence_OtpVerification.png}
+    \caption{Sequence diagram of the self-service student OTP verification}
+    \label{fig:seq_otp_verify}
+\end{figure}
+
+\subsection{Sequence Diagram: Driver Application and Admin Approval}
+
+Becoming a driver requires a structured application that an administrator reviews before granting the driver role. The diagram in Figure~\ref{fig:seq_driver_app} describes the full flow: the user submits a form containing identity and vehicle details, the application is stored with a \textit{PENDING} status, the administrator reviews it in the dedicated admin panel tab, and upon approval the system automatically creates the driver profile and the vehicle record and notifies the applicant.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth, height=0.9\textheight, keepaspectratio]{ForsaDrive_Sequence_DriverApplication.png}
+    \caption{Sequence diagram of the driver application and admin approval flow}
+    \label{fig:seq_driver_app}
+\end{figure}
+
+
+\section{Activity Diagram of the Booking Flow}
+
+In order to give a global view of the booking process, an activity diagram is used to follow the journey of a passenger from the moment the application is opened until the trip is rated. The diagram, shown in Figure~\ref{fig:activity_booking_flow}, is split into three swimlanes that correspond to the passenger, the system, and the driver. It complements the sequence diagrams by emphasizing the decision points --- the retry of a failed payment, the acceptance or refusal of the booking by the driver, the departure and arrival confirmations, and the cash collection at the end of the trip --- rather than the technical messages exchanged between the components.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth, height=0.9\textheight, keepaspectratio]{ForsaDrive_Activity_BookingFlow.png}
+    \caption{Activity diagram of the end-to-end booking flow}
+    \label{fig:activity_booking_flow}
+\end{figure}
+
+
+\section{Class Diagram}
+
+The class diagram describes the structural backbone of the application. Given the breadth of the platform, the diagram regroups around twenty classes that cover not only the core booking entities but also the secondary features that have been identified as relevant for a Tunisian carpooling platform: student verification, complaints, ratings, route boosting, social feed, and analytics. The full diagram is shown in Figure~\ref{fig:class_diagram}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth, height=0.9\textheight, keepaspectratio]{forsadrive_class_diagram.png}
+    % If the labels are too small in the rendered PDF, switch to a landscape page:
+    % \usepackage{pdflscape}  % in the preamble
+    % \begin{landscape} ... \includegraphics[width=\linewidth]{...} ... \end{landscape}
+    \caption{Class diagram of ForsaDrive}
+    \label{fig:class_diagram}
+\end{figure}
+
+For readability, the main classes are organized into five logical groups.
+
+\paragraph{Users and profiles.} The class \textit{User} represents any registered account and centralizes the credentials, the personal information, the verification status, and the role (\textit{PASSENGER}, \textit{DRIVER}, or \textit{ADMIN}). It is enriched by \textit{DriverProfile}, which holds the vehicle information and the reliability indicators of a driver, and by \textit{UserPreferences}, which describes the preferred travel conditions of a user (music, conversation, smoking tolerance, on-board amenities).
+
+\paragraph{Trips and bookings.} The class \textit{Route} represents a ride offered by a driver, with its origin, its destination, its date, its price, and its available seats. \textit{Booking} represents a reservation made by a passenger on a route and stores the booked seats, the total amount, the prepayment, and the booking status. The optional class \textit{GroupPayment} models the splitting of a booking among several passengers traveling together.
+
+\paragraph{Payments and ratings.} The class \textit{Payment} represents the financial operations linked to a booking, whether it is the prepayment or the final settlement. \textit{Rating} represents the feedback left by a user after a completed trip and feeds back into the average score and the reliability indicators stored on \textit{DriverProfile}.
+
+\paragraph{Verification and discounts.} The class \textit{StudentVerification} stores a verification request, with the uploaded document, the declared university, and the decision of the administrator. It is supported by \textit{SupportedUniversity}, which lists the institutions whose email domains are recognized by the platform, and by \textit{VerificationCode}, which manages email verification codes. The class \textit{DiscountCode} models promotional codes that can be applied at booking time.
+
+\paragraph{Communication and moderation.} The classes \textit{Message} and \textit{Notification} carry the conversations between users and the alerts emitted by the system. \textit{Complaint} allows a user to report a problem after a trip and gives the administrator the means to take action, ranging from a warning to a permanent ban.
+
+Around these core classes, complementary entities such as \textit{DriverAnalytics}, \textit{RoutePopularity}, \textit{MatchHistory}, \textit{RouteBoost}, \textit{FeedPost}, and \textit{FeedInteraction} support the analytical and social dimension of the platform without polluting the central booking workflow.
+
+
+\section{Database Design}
+
+The class diagram has been translated into a relational model that serves as the schema of the backend database. The translation follows the standard rules: each persistent class becomes a table, each one-to-many association becomes a foreign key, and many-to-many associations are realized through dedicated join tables.
+
+\subsection{Logical Schema}
+
+The logical schema below uses the conventional notation, where primary keys are underlined and foreign keys are marked with the \# symbol. For the sake of readability, only the most representative tables are listed.
+
+\begin{itemize}[noitemsep]
+    \item \textbf{User} (\underline{id\_user}, full\_name, email, phone, password\_hash, role, profile\_picture, is\_active, is\_student\_verified, created\_at, updated\_at)
+    \item \textbf{DriverProfile} (\underline{id\_driver\_profile}, \#id\_user, vehicle\_model, vehicle\_plate, vehicle\_color, total\_seats, avg\_rating, reliability\_score, completion\_rate, cancellation\_rate, created\_at)
+    \item \textbf{UserPreferences} (\underline{id\_preferences}, \#id\_user, preferred\_music\_type, prefers\_conversation, smoking\_tolerance, has\_wifi, has\_phone\_charger)
+    \item \textbf{Route} (\underline{id\_route}, \#id\_driver, origin, destination, departure\_datetime, price\_per\_seat, total\_seats, available\_seats, status, is\_boosted, created\_at)
+    \item \textbf{Booking} (\underline{id\_booking}, \#id\_route, \#id\_passenger, seats\_booked, seat\_positions, total\_price, amount\_paid, amount\_remaining, booking\_status, created\_at, confirmed\_at)
+    \item \textbf{Payment} (\underline{id\_payment}, \#id\_booking, amount, payment\_method, payment\_type, transaction\_id, payment\_status, payment\_date)
+    \item \textbf{Rating} (\underline{id\_rating}, \#id\_booking, \#id\_reviewer, reviewer\_role, score, comment, created\_at)
+    \item \textbf{StudentVerification} (\underline{id\_verification}, \#id\_user, \#id\_university, student\_id\_document, university\_email, verification\_status, verified\_at, \#id\_admin, rejection\_reason)
+    \item \textbf{SupportedUniversity} (\underline{id\_university}, name, short\_name, email\_domain, country, is\_active)
+    \item \textbf{DiscountCode} (\underline{id\_discount}, code, discount\_percentage, applicable\_to, max\_usage, current\_usage, expiry\_date, is\_active, \#id\_admin)
+    \item \textbf{Message} (\underline{id\_message}, \#id\_sender, \#id\_receiver, message\_text, is\_read, sent\_at, read\_at)
+    \item \textbf{Notification} (\underline{id\_notification}, \#id\_user, notification\_type, title, message, is\_read, created\_at)
+    \item \textbf{Complaint} (\underline{id\_complaint}, \#id\_complainant, \#id\_accused, \#id\_booking, complaint\_type, complaint\_text, evidence\_url, status, action\_taken, created\_at, resolved\_at, \#id\_admin)
+\end{itemize}
+
+\subsection{Constraints and Indexing}
+
+A few business rules deserve to be enforced at the database level rather than only in the application code, since this guarantees their consistency even when the data is touched outside the normal application paths. The number of available seats on a route is constrained between zero and the total number of seats. The booking status follows a controlled state machine (\textit{PENDING}, \textit{CONFIRMED}, \textit{CANCELLED}, \textit{COMPLETED}, \textit{NO\_SHOW}), and the corresponding transitions are checked before any update. Indexes are added on the columns that are frequently used for filtering, in particular the origin and the destination of a route, the departure date, and the foreign keys that link bookings to their route and to their passenger. These indexes ensure that the search operation, which is the most frequent action on the platform, remains responsive even as the volume of data grows.
+
+
+\section*{Conclusion}
+
+This chapter presented the design of ForsaDrive at several levels of abstraction. The general architecture defined the boundary between the clients, the backend, and the external services, and clarified the security mechanisms that protect the platform. The refined use cases, together with the sequence and activity diagrams, described the most sensitive scenarios of the application -- namely the publication of a route, the booking of a ride with prepayment, and the verification of a student. Finally, the class diagram and the relational schema laid down the data foundations of the system. With this design in place, the next chapter turns to the implementation: the technologies that have been chosen, the structure of the source code, and the most representative screens of the resulting application.

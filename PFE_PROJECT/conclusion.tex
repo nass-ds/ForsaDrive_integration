@@ -1,0 +1,22 @@
+\chapter*{General Conclusion}
+\addcontentsline{toc}{chapter}{General Conclusion}
+\markboth{General Conclusion}{}
+
+\par This Final Year Project was carried out within \textbf{ATOMIC IT} as part of the design and development of \textbf{ForsaDrive}, a carpooling platform built specifically for the Tunisian context. The project was delivered as two coordinated applications --- a responsive web platform and a cross-platform mobile application --- both driven by a unified REST API and a shared database.
+
+\par Looking back at the objectives set at the start of the internship, the core requirements have been met. Users can register as passengers or as drivers, search and publish rides, book seats with a fifty-percent prepayment, communicate through in-app chat, and rate each other after a completed trip. Students can verify their status through a university email OTP flow and receive an automatic discount on eligible bookings. Drivers go through a structured application reviewed by an administrator before gaining access to the driver features. The administration panel gives platform operators full control over users, rides, complaints, and organizational accounts.
+
+\par Beyond the initial scope, several features were added progressively as the sprints moved forward and our understanding of the target users deepened. The social feed, the ride boosting system, the AI-assisted helpdesk with bot escalation, the driver analytics dashboard, and the multilingual interface with Arabic RTL support all came out of this ongoing refinement.
+
+\par On the technical side, the project was a genuine learning experience. Coordinating two clients against a single backend required careful API design from the very first sprint. Flutter exposed us to reactive state management and cross-platform rendering in ways that were new to us. Implementing WAL mode on SQLite to allow concurrent reads while the web server writes was one of those concrete problems where solving it gave a much better understanding of database concurrency than any textbook example.
+
+\par The project also has real limitations worth acknowledging. The wallet relies on manual top-ups because no local payment gateway was available for integration within the internship period. SQLite is practical for development but not suited for a high-traffic production environment. The mobile application was tested only on Android, and performance under load was not measured. A forgot-password flow is also missing.
+
+\par These gaps are, in a sense, the roadmap for what comes next. A real deployment would require migrating to PostgreSQL or MySQL, integrating a local payment provider such as Konnect or Paymee, setting up a production server with HTTPS and automated backups, and releasing the Flutter app to the Google Play Store. Two-factor authentication for driver and admin accounts, an offline-first cache for the mobile client, and a password reset email flow would close the remaining security and usability gaps.
+
+\par In a broader sense, this project shows that the technical barriers to a locally adapted carpooling platform are not as high as they might seem. The demand among Tunisian students and commuters is clearly there. What has been missing is a product that fits local payment habits, speaks the right languages, and is designed with an understanding of how trips are actually organized in Tunisia. We hope ForsaDrive, at whatever stage it continues from here, contributes something toward filling that gap.
+
+\vspace{0.8cm}
+\begin{flushright}
+\textit{Youssef BEN ABID \quad \& \quad Anas YOUNES}
+\end{flushright}

@@ -1,0 +1,97 @@
+@startuml ForsaDrive_Sequence_OtpVerification
+
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor Student
+participant "Mobile App\n(Flutter)" as UI
+participant "PHP API\n(/student/)" as Backend
+database "SQLite DB" as DB
+participant "Email\nService" as Email
+
+title Sequence Diagram: Student Email OTP Verification
+
+== Step 1 — Enter University Email ==
+Student -> UI: Navigate to Student Verification
+activate UI
+UI --> Student: Show email input form\n(university email required)
+Student -> UI: Enter university email\n(e.g. nab25@esprit.tn)
+
+UI -> Backend: POST /student/send-otp\n{email: "nab25@esprit.tn"}
+activate Backend
+
+Backend -> DB: SELECT domain FROM student_domains\nWHERE domain = 'esprit.tn'
+activate DB
+DB --> Backend: Domain found (is_active = 1)
+deactivate DB
+
+alt Domain NOT recognized
+    Backend --> UI: 400 — "Email domain not in\nrecognized university list"
+    UI --> Student: Show error + list of\naccepted domains
+else Domain recognized
+    Backend -> Backend: Generate 6-digit OTP\nvia secure random
+    Backend -> DB: DELETE existing OTP for user;\nINSERT student_otp_codes\n(user_id, email, code,\nexpires_at = now+10min,\nattempts = 0)
+    activate DB
+    DB --> Backend: OTP stored
+    deactivate DB
+
+    Backend -> Email: Send OTP email to\nnab25@esprit.tn\n"Your ForsaDrive code: 4 8 2 1 9 3"
+    activate Email
+    Email --> Backend: Email dispatched
+    deactivate Email
+
+    Backend --> UI: 200 — {masked_email: "na***@esprit.tn"}
+    deactivate Backend
+    UI --> Student: Show 6-digit input screen\n"Code sent to na***@esprit.tn\n(valid 10 minutes)"
+end
+
+== Step 2 — Enter OTP Code ==
+Student -> UI: Enter 6-digit code (e.g. 482193)
+activate UI
+UI -> Backend: POST /student/verify-otp\n{email: "nab25@esprit.tn", code: "482193"}
+activate Backend
+
+Backend -> DB: SELECT * FROM student_otp_codes\nWHERE user_id = ? AND email = ?
+activate DB
+DB --> Backend: Return OTP record
+deactivate DB
+
+alt Code expired (expires_at < now)
+    Backend -> DB: DELETE OTP record
+    Backend --> UI: 410 — "Code expired,\nplease request a new one"
+    UI --> Student: Show expiry message\n+ Resend button
+
+else Attempts >= 5
+    Backend -> DB: DELETE OTP record
+    Backend --> UI: 429 — "Too many attempts,\nplease request a new code"
+    UI --> Student: Show lockout message
+
+else Code incorrect
+    Backend -> DB: UPDATE attempts = attempts + 1
+    Backend --> UI: 400 — "Incorrect code\n(X attempts remaining)"
+    UI --> Student: Show error with\nremaining attempts
+
+else Code correct
+    Backend -> DB: DELETE OTP record
+    activate DB
+    DB --> Backend: Deleted
+    deactivate DB
+
+    Backend -> DB: UPDATE users SET is_student = 1\nWHERE id = ?
+    activate DB
+    DB --> Backend: Updated
+    deactivate DB
+
+    Backend -> DB: INSERT student_verifications\n(user_id, method='EMAIL',\nstatus='APPROVED', verified_at=now)
+    activate DB
+    DB --> Backend: Recorded
+    deactivate DB
+
+    Backend --> UI: 200 — {user: {..., is_student: true}}
+    deactivate Backend
+    UI --> Student: Show success screen\n"Student status verified!\n50% discount now active"
+end
+
+deactivate UI
+
+@enduml

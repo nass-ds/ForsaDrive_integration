@@ -1,0 +1,116 @@
+%=============================================================================
+%  CHAPTER 8 — GENERAL CONCLUSION AND FUTURE WORK
+%=============================================================================
+\chapter{General Conclusion and Future Work}
+
+\section*{Chapter Introduction}
+
+This chapter concludes the report by summarising the work carried out throughout the ForsaDrive project. It highlights the main achievements, evaluates the extent to which the initial objectives were met, discusses the limitations of the current system, and presents perspectives for future improvements and potential real-world deployment.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Summary of Achievements}
+
+The objective of this project was to design and develop \textbf{ForsaDrive}, a ride-sharing platform adapted to the Tunisian context and implemented as both a web application and a mobile application.
+
+Throughout this project, a complete software engineering process was followed, starting from problem identification and requirements analysis to system design, implementation, and validation.
+
+The main achievements of the project can be summarised as follows:
+
+\begin{itemize}[noitemsep]
+    \item Design and implementation of a \textbf{dual-platform system}: a PHP web application and a Flutter mobile application sharing the same SQLite database through a unified REST API.
+    \item Implementation of the \textbf{full ride-sharing lifecycle}: ride publication, advanced search with filters, single and group booking with fifty-percent prepayment, driver acceptance flow, departure and arrival confirmation, cash collection, and trip receipt generation.
+    \item Integration of a \textbf{wallet system} supporting balance top-up, booking deductions, refunds, and a full transaction history.
+    \item \textbf{Student verification} through university email domain recognition and a six-digit OTP code, granting an automatic fifty-percent discount on eligible rides.
+    \item \textbf{Driver registration} with a structured application form (CIN, license, vehicle details) reviewed and approved by an administrator.
+    \item \textbf{Real-time in-app messaging} between passengers and drivers, with read receipts and automatic notification on new messages.
+    \item \textbf{Push notifications} delivered through Firebase Cloud Messaging for bookings, ride updates, messages, and admin actions.
+    \item \textbf{AI-assisted HelpDesk} with a rule-based bot that handles fourteen FAQ categories and escalates unresolved tickets to human agents.
+    \item \textbf{Social feed} supporting driver ride posts, passenger requests, likes, comments, and direct booking from a post.
+    \item \textbf{Ride boosting system} allowing drivers to promote a ride to the top of the feed for a fixed fee deducted from the wallet.
+    \item \textbf{Smart matching} that computes a compatibility score for each ride based on geography, shared history, preferences, reliability, and rating.
+    \item \textbf{Driver analytics dashboard} with a reliability score arc gauge, six-month revenue and rating trend charts, and server-generated improvement recommendations.
+    \item \textbf{Personalized AI recommendations} on the home screen: collaborative-filtering suggestions, trending routes, and nearby rides.
+    \item \textbf{Interactive route map} using OpenStreetMap tiles and the OSRM routing service, embedded directly in the ride detail screen.
+    \item \textbf{Multilingual interface} covering French, English, and Arabic with automatic RTL layout for Arabic.
+    \item \textbf{Administration panel} with seven management tabs: users, rides, student verifications, complaints, organizations, driver applications, and student domain management.
+    \item \textbf{Organization management} supporting company or university applications, member management, and shared discount codes.
+\end{itemize}
+
+These achievements demonstrate that the system successfully addresses the core requirements defined at the beginning of the project.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Evaluation of Objectives}
+
+The objectives defined in Chapter 2 were largely achieved.
+
+\begin{itemize}[noitemsep]
+    \item The system was successfully implemented as both a web and a mobile application, ensuring accessibility across platforms.
+    \item Core functionalities such as ride management, booking, messaging, and wallet operations are fully operational.
+    \item A consistent backend architecture ensures data integrity and unified business logic.
+    \item Security measures, including authentication and input validation, were implemented.
+\end{itemize}
+
+Although certain advanced features were not fully implemented due to time constraints, the essential system requirements were satisfied, and the platform is functional and coherent.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Project Contributions}
+
+The ForsaDrive project contributes both technically and conceptually.
+
+\subsection{Technical Contributions}
+
+\begin{itemize}[noitemsep]
+    \item Demonstration of a multi-platform architecture integrating web and mobile clients
+    \item Implementation of a modular backend with RESTful communication
+    \item Design of a structured database supporting complex interactions
+    \item Application of software engineering principles in a real-world scenario
+\end{itemize}
+
+\subsection{Practical Contributions}
+
+\begin{itemize}[noitemsep]
+    \item Proposal of a locally adapted ride-sharing solution for Tunisia
+    \item Improvement of accessibility and affordability of transportation
+    \item Potential support for student mobility and cost reduction
+\end{itemize}
+
+These contributions highlight the relevance of the project beyond its academic scope.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Limitations of the Current System}
+
+Despite its achievements, the system presents several limitations that are mainly due to the time constraints and the academic nature of the project:
+
+\begin{itemize}[noitemsep]
+    \item The application was deployed only in a local environment; no production hosting or domain was configured.
+    \item No real payment gateway integration was implemented; wallet top-up is performed manually through the administration panel.
+    \item Performance testing under high concurrent load was not conducted; the system has only been validated under normal single-user usage.
+    \item SQLite is not suitable for large-scale production workloads with many concurrent writers.
+    \item Mobile application testing was limited to Android devices; iOS was not tested on a physical device.
+    \item The password reset flow (forgot password) is not yet implemented.
+\end{itemize}
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Future Work and Perspectives}
+
+Despite the breadth of the current implementation, several improvements can be considered to bring ForsaDrive closer to a production-ready system.
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Real payment gateway integration.} The wallet is currently topped up manually by an administrator. Integrating a local payment provider (such as Konnect or Paymee) would allow users to top up their balance directly from the application.
+    \item \textbf{Cloud deployment.} The platform currently runs on a local XAMPP server. Migrating to a hosted environment (a VPS or a PaaS provider) with HTTPS, automated backups, and a monitored uptime is the natural next step toward a real launch.
+    \item \textbf{Production-grade database.} SQLite is suitable for a single-server deployment but does not scale horizontally. Migrating to PostgreSQL or MySQL would unlock connection pooling, row-level locking, and replication.
+    \item \textbf{Password reset flow.} A secure ``forgot password'' email link is not yet implemented. This is a standard expectation for any consumer application and should be prioritized before a public launch.
+    \item \textbf{iOS App Store and Google Play submission.} The Flutter codebase already targets both platforms; building the release bundles, preparing the store assets (icon, screenshots, privacy policy), and submitting for review is the remaining step.
+    \item \textbf{Offline mode.} Caching the last-seen rides and bookings locally using \texttt{sqflite} would allow passengers with intermittent connectivity to consult their upcoming trips without an active connection.
+    \item \textbf{Load and stress testing.} Large-scale performance evaluation under simulated concurrent users has not been conducted. Tools such as Apache JMeter or k6 would help identify bottlenecks before a public launch.
+    \item \textbf{Two-factor authentication.} Adding a TOTP or SMS second factor for administrator and driver accounts would further reduce the risk of account takeover.
+\end{itemize}
+
+In the long term, ForsaDrive could evolve into a fully operational platform contributing to the digital transformation of transportation in Tunisia.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section*{Chapter Conclusion}
+
+This chapter summarised the work carried out in the ForsaDrive project and evaluated its outcomes. The system successfully demonstrates the feasibility of a dual-platform ride-sharing solution adapted to the Tunisian context. While certain limitations remain, the project establishes a solid foundation for future development and real-world deployment.
+
+Overall, ForsaDrive represents a meaningful application of software engineering principles to address a real and relevant societal challenge.

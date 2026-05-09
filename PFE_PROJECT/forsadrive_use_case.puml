@@ -1,0 +1,211 @@
+@startuml ForsaDrive_UseCase
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+
+' ==============================
+' 1. Guest View
+' ==============================
+
+actor Guest
+
+rectangle "ForsaDrive — Guest" {
+  (View Landing Page)
+  (Register)
+  (Login)
+  (Select Role at Registration)
+  (Validate Credentials)
+}
+
+Guest --> (View Landing Page)
+Guest --> (Register)
+Guest --> (Login)
+
+(Register)  ..> (Select Role at Registration) : <<include>>
+(Login)     ..> (Validate Credentials)        : <<include>>
+
+
+' ==============================
+' 2. Passenger View
+' ==============================
+
+actor Passenger
+
+rectangle "ForsaDrive — Passenger" {
+  (Search Rides)
+  (Apply Filters and Sort)
+  (View Ride Details and Map)
+  (Book Ride)
+  (Group Booking)
+  (Cancel Booking)
+  (View My Rides)
+  (View Trip Receipt)
+  (Manage Wallet)
+  (Verify Student Status via OTP)
+  (Rate Driver)
+  (Submit Complaint)
+  (Chat with Driver)
+  (Contact HelpDesk)
+  (Browse Social Feed)
+  (Post on Feed)
+  (Like and Comment on Post)
+  (Book from Feed Post)
+  (View Notifications)
+  (Manage Profile)
+}
+
+Passenger --> (Search Rides)
+Passenger --> (View Ride Details and Map)
+Passenger --> (Book Ride)
+Passenger --> (Group Booking)
+Passenger --> (Cancel Booking)
+Passenger --> (View My Rides)
+Passenger --> (View Trip Receipt)
+Passenger --> (Manage Wallet)
+Passenger --> (Verify Student Status via OTP)
+Passenger --> (Rate Driver)
+Passenger --> (Submit Complaint)
+Passenger --> (Chat with Driver)
+Passenger --> (Contact HelpDesk)
+Passenger --> (Browse Social Feed)
+Passenger --> (Post on Feed)
+Passenger --> (View Notifications)
+Passenger --> (Manage Profile)
+
+(Search Rides)   ..> (Apply Filters and Sort)  : <<extend>>
+(Book Ride)      ..> (Manage Wallet)            : <<include>>
+(Group Booking)  ..> (Book Ride)               : <<extend>>
+(Post on Feed)   ..> (Like and Comment on Post) : <<extend>>
+(Browse Social Feed) ..> (Book from Feed Post)  : <<extend>>
+(Verify Student Status via OTP) ..> (Book Ride) : <<extend>>
+
+
+' ==============================
+' 3. Driver View
+' ==============================
+
+actor Driver
+
+rectangle "ForsaDrive — Driver" {
+  (Apply to Become Driver)
+  (Publish Ride)
+  (Manage My Rides)
+  (Confirm Departure)
+  (Mark Arrival)
+  (Collect Cash Payment)
+  (Manage Booking Requests)
+  (Accept or Reject Booking)
+  (Boost Ride on Feed)
+  (Manage Vehicles)
+  (View Driver Analytics)
+  (View Reliability Score)
+  (Rate Passenger)
+  (Chat with Passenger)
+  (View Earnings)
+}
+
+Driver --> (Apply to Become Driver)
+Driver --> (Publish Ride)
+Driver --> (Manage My Rides)
+Driver --> (Confirm Departure)
+Driver --> (Mark Arrival)
+Driver --> (Collect Cash Payment)
+Driver --> (Manage Booking Requests)
+Driver --> (Boost Ride on Feed)
+Driver --> (Manage Vehicles)
+Driver --> (View Driver Analytics)
+Driver --> (Rate Passenger)
+Driver --> (Chat with Passenger)
+
+(Manage Booking Requests) ..> (Accept or Reject Booking) : <<include>>
+(View Driver Analytics)   ..> (View Reliability Score)   : <<include>>
+(Mark Arrival)            ..> (Collect Cash Payment)     : <<include>>
+(Boost Ride on Feed)      ..> (Manage Wallet)            : <<include>>
+
+
+' ==============================
+' 4. Admin View
+' ==============================
+
+actor Admin
+
+rectangle "ForsaDrive — Admin" {
+  (Manage Users)
+  (Suspend or Unsuspend User)
+  (Adjust User Balance)
+  (Review Student Verifications)
+  (Approve or Reject Student)
+  (Review Driver Applications)
+  (Approve or Reject Driver)
+  (Manage Complaints)
+  (Manage Organizations)
+  (Approve or Reject Organization)
+  (Manage Student Domains)
+  (View Platform Statistics)
+  (Cancel Any Ride)
+}
+
+Admin --> (Manage Users)
+Admin --> (Review Student Verifications)
+Admin --> (Review Driver Applications)
+Admin --> (Manage Complaints)
+Admin --> (Manage Organizations)
+Admin --> (Manage Student Domains)
+Admin --> (View Platform Statistics)
+
+(Manage Users)               ..> (Suspend or Unsuspend User) : <<include>>
+(Manage Users)               ..> (Adjust User Balance)       : <<extend>>
+(Review Student Verifications) ..> (Approve or Reject Student)   : <<include>>
+(Review Driver Applications)   ..> (Approve or Reject Driver)    : <<include>>
+(Manage Organizations)         ..> (Approve or Reject Organization) : <<include>>
+(Manage Complaints)            ..> (Cancel Any Ride)              : <<extend>>
+
+
+' ==============================
+' 5. HelpDesk Agent View
+' ==============================
+
+actor "HelpDesk Agent" as Agent
+
+rectangle "ForsaDrive — HelpDesk" {
+  (View Open Tickets)
+  (Reply to User)
+  (Resolve Ticket)
+  (Escalate from Bot)
+}
+
+Agent --> (View Open Tickets)
+Agent --> (Reply to User)
+Agent --> (Resolve Ticket)
+Agent --> (Escalate from Bot)
+
+
+' ==============================
+' 6. System (Automated)
+' ==============================
+
+actor System
+
+rectangle "ForsaDrive — Automated Processes" {
+  (Send Push Notifications)
+  (Apply Student Discount at Booking)
+  (Calculate Reliability Score)
+  (Generate Driver Analytics)
+  (Run AI HelpDesk Bot)
+  (Compute Match Score)
+  (Rank Social Feed Posts)
+  (Expire Boost Timer)
+  (Expire OTP Codes)
+}
+
+System --> (Send Push Notifications)
+System --> (Apply Student Discount at Booking)
+System --> (Calculate Reliability Score)
+System --> (Generate Driver Analytics)
+System --> (Run AI HelpDesk Bot)
+System --> (Compute Match Score)
+System --> (Rank Social Feed Posts)
+System --> (Expire Boost Timer)
+System --> (Expire OTP Codes)
+
+@enduml

@@ -73,6 +73,16 @@ class UserService {
     await _api.post('/profile/', {'action': 'become_driver'});
   }
 
+  // ── Student verification ──────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> sendStudentOtp(String email) async {
+    return await _api.post('/student/send-otp', {'email': email});
+  }
+
+  Future<Map<String, dynamic>> verifyStudentOtp(String email, String code) async {
+    return await _api.post('/student/verify-otp', {'email': email, 'code': code});
+  }
+
   // ── Student domains ───────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getStudentDomains() async {
@@ -129,5 +139,18 @@ class UserService {
 
   Future<void> removeStudentDomain(int id) async {
     await _api.delete('/admin/student-domains/$id');
+  }
+
+  Future<List<Map<String, dynamic>>> getAdminOrganizations() async {
+    final res = await _api.get('/admin/organizations');
+    final list = res['organizations'] as List<dynamic>? ?? [];
+    return list.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  Future<void> reviewOrganization(int id, String action, {String? rejectionReason}) async {
+    await _api.post('/admin/organizations/$id/review', {
+      'action': action,
+      if (rejectionReason != null) 'rejection_reason': rejectionReason,
+    });
   }
 }

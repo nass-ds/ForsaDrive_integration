@@ -11,6 +11,10 @@ class RideService {
     String? date,
     int? seats,
     String? sort,
+    double? minPrice,
+    double? maxPrice,
+    double? minRating,
+    List<String>? amenities,
   }) async {
     final params = <String, String>{
       if (from != null && from.isNotEmpty) 'from': from,
@@ -18,6 +22,10 @@ class RideService {
       if (date != null && date.isNotEmpty) 'date': date,
       if (seats != null) 'seats': seats.toString(),
       if (sort != null && sort.isNotEmpty) 'sort': sort,
+      if (minPrice != null) 'min_price': minPrice.toString(),
+      if (maxPrice != null) 'max_price': maxPrice.toString(),
+      if (minRating != null) 'min_rating': minRating.toString(),
+      if (amenities != null && amenities.isNotEmpty) 'amenities': amenities.join(','),
     };
     final res = await _api.get('/rides/', params: params);
     final list = res['rides'] as List<dynamic>? ?? [];
@@ -33,7 +41,8 @@ class RideService {
   Future<void> createRide({
     required String from,
     required String to,
-    required String departureTime,
+    required String date,
+    required String time,
     required int seats,
     required double price,
     String? notes,
@@ -41,7 +50,7 @@ class RideService {
     await _api.post('/rides/', {
       'from_location': from,
       'to_location': to,
-      'departure_time': departureTime,
+      'departure_time': '$date $time',
       'available_seats': seats,
       'price': price,
       if (notes != null) 'notes': notes,
@@ -76,22 +85,31 @@ class RideService {
     return await _api.get('/rides/$rideId/receipt');
   }
 
-  Future<void> bookRide(int rideId, int seats) async {
+  Future<void> bookRide(int rideId, int seats, {String? promoCode}) async {
     await _api.post('/bookings/', {
       'ride_id': rideId,
       'seats': seats,
+      if (promoCode != null) 'promo_code': promoCode,
     });
+  }
+
+  Future<Map<String, dynamic>> validatePromoCode(String code) async {
+    return await _api.post('/bookings/validate-promo', {'code': code});
   }
 
   Future<Map<String, dynamic>> bookGroup({
     required int rideId,
     required int seats,
     String? notes,
+    bool splitPayment = false,
+    List<Map<String, dynamic>>? passengers,
   }) async {
     return await _api.post('/bookings/group', {
       'ride_id': rideId,
       'seats': seats,
+      'split_payment': splitPayment,
       if (notes != null) 'notes': notes,
+      if (passengers != null) 'passengers': passengers,
     });
   }
 

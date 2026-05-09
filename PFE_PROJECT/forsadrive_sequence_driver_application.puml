@@ -1,0 +1,137 @@
+@startuml ForsaDrive_Sequence_DriverApplication
+
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor User
+participant "Mobile App\n(Flutter)" as UI
+participant "PHP API\n(/admin/)" as Backend
+database "SQLite DB" as DB
+participant "Notification\nService" as Notif
+actor Admin
+
+title Sequence Diagram: Driver Application and Admin Approval
+
+== User Submits Driver Application ==
+User -> UI: Tap "Become a Driver"\nin Settings
+activate UI
+UI --> User: Show requirements page\n(CIN, license, vehicle needed)
+User -> UI: Tap "Apply"
+UI --> User: Show application form
+
+User -> UI: Fill in:\n- CIN number\n- License number\n- Years of experience\n- Vehicle make/model/year\n- Plate number / seats / A/C\n- Notes (optional)
+
+User -> UI: Submit application
+
+UI -> Backend: POST /profile/\n{action: "apply_driver", cin: ...,\nlicense: ..., vehicle: {...}}
+activate Backend
+
+Backend -> DB: SELECT * FROM driver_applications\nWHERE user_id = ? AND status = 'pending'
+activate DB
+DB --> Backend: No pending application found
+deactivate DB
+
+Backend -> DB: INSERT driver_applications\n(user_id, cin, license, experience,\nvehicle_make/model/year/plate/seats,\nstatus = 'pending')
+activate DB
+DB --> Backend: Application created
+deactivate DB
+
+Backend --> UI: 200 — {status: "pending"}
+deactivate Backend
+UI --> User: Show status screen\n"Application submitted.\nWaiting for admin review."
+deactivate UI
+
+== Admin Reviews Application ==
+Admin -> UI: Open Admin Panel\n→ Drivers tab
+activate UI
+UI -> Backend: GET /admin/?tab=drivers
+activate Backend
+Backend -> DB: SELECT * FROM driver_applications\nORDER BY status='pending' DESC
+activate DB
+DB --> Backend: Return all applications
+deactivate DB
+Backend --> UI: Return applications list
+deactivate Backend
+UI --> Admin: Show applications\n(pending first, with full vehicle details)
+deactivate UI
+
+Admin -> UI: Click on application\n→ Review CIN, license, vehicle info
+activate UI
+
+alt Admin approves
+    Admin -> UI: Click "Approve"
+    UI --> Admin: Confirmation dialog
+    Admin -> UI: Confirm
+
+    UI -> Backend: POST /admin/\n{action: "approve_driver",\nuser_id: X}
+    activate Backend
+
+    Backend -> DB: UPDATE driver_applications\nSET status = 'approved'
+    activate DB
+    DB --> Backend: Updated
+    deactivate DB
+
+    Backend -> DB: UPDATE users SET is_driver = 1\nWHERE id = X
+    activate DB
+    DB --> Backend: Updated
+    deactivate DB
+
+    Backend -> DB: INSERT INTO driver_profiles\n(user_id, reliabilityScore=50, ...)
+    activate DB
+    DB --> Backend: Profile created
+    deactivate DB
+
+    Backend -> DB: INSERT INTO vehicles\n(make, model, year, plate, seats,\nhas_ac) FROM application data
+    activate DB
+    DB --> Backend: Vehicle created
+    deactivate DB
+
+    Backend -> Notif: Send push notification\nto user: "Application approved!\nYou can now publish rides."
+    activate Notif
+    Notif --> Backend: Sent
+    deactivate Notif
+
+    Backend --> UI: 200 — success
+    deactivate Backend
+    UI --> Admin: Show "Driver approved" toast
+    deactivate UI
+
+else Admin rejects
+    Admin -> UI: Click "Reject"
+    UI --> Admin: Reason input dialog
+    Admin -> UI: Enter reason\n(e.g. "License unclear")
+
+    UI -> Backend: POST /admin/\n{action: "reject_driver",\nuser_id: X, reason: "..."}
+    activate Backend
+
+    Backend -> DB: UPDATE driver_applications\nSET status = 'rejected',\nrejection_reason = "..."
+    activate DB
+    DB --> Backend: Updated
+    deactivate DB
+
+    Backend -> Notif: Send push notification\nto user: "Application rejected.\nReason: License unclear.\nYou may reapply."
+    activate Notif
+    Notif --> Backend: Sent
+    deactivate Notif
+
+    Backend --> UI: 200 — success
+    deactivate Backend
+    UI --> Admin: Show "Driver rejected" toast
+    deactivate UI
+end
+
+== User Checks Status ==
+User -> UI: Reopen Driver Application screen
+activate UI
+UI -> Backend: GET /profile/?action=my_driver_application
+activate Backend
+Backend -> DB: SELECT * FROM driver_applications\nWHERE user_id = ?
+activate DB
+DB --> Backend: Return latest application
+deactivate DB
+Backend --> UI: Return application with status
+deactivate Backend
+UI --> User: Show status card:\nApproved (green) or Rejected (red)\nwith reason and "Reapply" button
+deactivate UI
+
+@enduml

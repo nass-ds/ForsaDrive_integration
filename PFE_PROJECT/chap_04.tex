@@ -1,0 +1,169 @@
+%=============================================================================
+%  CHAPTER 4 — REALIZATION OF THE WEB PLATFORM
+%=============================================================================
+\chapter{Realization of the Web Platform}
+
+\clearpage
+\section*{Introduction}
+
+The previous chapters defined what the system must do and how it must be structured. This chapter focuses on the concrete realization of the web side of ForsaDrive. It describes the development environment, the technologies that were selected to build the application, and presents the main interfaces delivered at the end of the implementation phase.
+
+
+\section{Development Environment}
+
+\subsection{Hardware Environment}
+
+The platform was developed on two personal workstations used in parallel by the team. Each machine had enough resources to run the development server, the database engine, and the emulators needed during the implementation. The hardware configurations are summarized in the following table.
+
+\begin{table}[H]
+\centering
+\caption{Hardware environment}
+\begin{tabular}{|l|p{9cm}|}
+\hline
+\textbf{Component}     & \textbf{Configuration} \\
+\hline
+Processor              & Intel Core i5 / i7 (8th generation or later) \\
+\hline
+Memory (RAM)           & 8 GB to 16 GB \\
+\hline
+Storage                & SSD, 256 GB or more \\
+\hline
+Operating system       & Windows 10 / Windows 11 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Software Environment}
+
+Several tools supported the different phases of the project, from version control to testing and deployment. The main ones are listed below.
+
+\begin{description}[noitemsep]
+    \item[Visual Studio Code] Main code editor used for both the backend and the frontend, with PHP and Flutter extensions.
+    \item[XAMPP] Local server stack providing Apache and PHP, used to run and test the web application during development.
+    \item[Git and GitHub] Used for version control and for sharing the code base between team members.
+    \item[Postman] Used to test the REST API endpoints during backend development.
+    \item[DB Browser for SQLite] Used to inspect and query the SQLite database during development.
+    \item[PlantUML] Used to produce the UML diagrams included in this report.
+\end{description}
+
+\section{Technologies Used}
+
+The technological choices were driven by the constraints of the project, the experience already acquired during the training at ISET, and the standards adopted by the host organization.
+
+\subsection{Frontend Technologies}
+
+\subsubsection{PHP with HTML and Bootstrap}
+
+The web interface is built with PHP rendered server-side, combined with HTML5 and Bootstrap 5 for layout and styling. PHP handles routing, session management, and page rendering in a unified server-side model, which avoids the complexity of a separate frontend build step. Bootstrap was chosen for its responsive grid system and its comprehensive set of UI components, which allowed the interface to be built consistently and quickly.
+
+\subsubsection{Vanilla JavaScript}
+
+Client-side interactivity is handled with plain JavaScript, without any additional framework. Dynamic behaviors such as form validation, tab switching in the administration panel, and AJAX calls for real-time feedback are implemented in small, focused scripts.
+
+\subsection{Backend Technologies}
+
+\subsubsection{PHP}
+
+The backend business logic is written in PHP and exposed as a REST API under the \texttt{/api/} route prefix. PHP was selected because the host organization already operates a PHP-based infrastructure, the language is natively supported by XAMPP without any additional runtime, and the team had prior experience with it. The API follows a front-controller pattern: a single \texttt{index.php} entry point parses the URL, dispatches the request to the appropriate handler file, and returns a JSON response.
+
+\subsubsection{Bearer Token Authentication}
+
+Authentication relies on randomly generated bearer tokens stored in an \texttt{api\_tokens} table. After a successful login, the server creates a 32-byte hex token with a 30-day expiry and returns it to the client. Every protected endpoint validates the token from the \texttt{Authorization} header and rejects requests that carry an expired or unknown token.
+
+\subsection{Database}
+
+SQLite was selected as the persistent store. It is a file-based, serverless relational database that requires no separate process, which makes it easy to set up, back up, and share between the web and mobile clients through the same shared file. The database runs in WAL (Write-Ahead Logging) mode to support concurrent reads from the mobile application while the web server writes. Indexes are placed on the columns most frequently used for filtering, in particular the origin, the destination, and the departure date of rides.
+
+\subsection{Other Tools and Services}
+
+\begin{description}[noitemsep]
+    \item[password\_hash / PASSWORD\_BCRYPT] Used for secure password hashing in PHP.
+    \item[Firebase Cloud Messaging (via PHP)] Server-side FCM calls to deliver push notifications to mobile devices.
+    \item[OpenStreetMap / Nominatim] Used for city geocoding lookups in the map feature.
+    \item[PDO (PHP Data Objects)] Used for all database interactions to ensure safe, parameterized queries.
+\end{description}
+
+\section{Presentation of the Web Interfaces}
+
+This section presents the main interfaces of the web application in the order a typical user would encounter them.
+
+\subsection{Landing Page}
+
+The landing page is the first contact a visitor has with ForsaDrive. It presents the concept of the platform, highlights the student discount, and offers quick access to registration and login.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{web_landing.png}
+    \caption{Web landing page}
+    \label{fig:web_landing}
+\end{figure}
+
+\subsection{Authentication}
+
+The authentication interface groups the login and registration forms. Input validation is performed on the client side for immediate feedback and confirmed on the server side for security.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{web_auth.png}
+    \caption{Authentication interface}
+    \label{fig:web_auth}
+\end{figure}
+
+\subsection{Home Dashboard}
+
+Once authenticated, the user reaches a personalized dashboard that displays the upcoming trips, the last bookings, and a shortcut to the search bar.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{web_dashboard.png}
+    \caption{Home dashboard after authentication}
+    \label{fig:web_dashboard}
+\end{figure}
+
+\subsection{Trip Publishing}
+
+The trip publishing form is dedicated to drivers. It requests the mandatory information needed to create a trip and gives a preview of how the trip will be shown to passengers.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{web_publish_trip.png}
+    \caption{Trip publishing form}
+    \label{fig:web_publish_trip}
+\end{figure}
+
+\subsection{Trip Search and Results}
+
+The search page lets passengers filter trips by origin, destination, date, and preferences. The results are displayed as cards that include the driver's name, the rating, the price, and the remaining seats.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{web_search.png}
+    \caption{Trip search and results page}
+    \label{fig:web_search}
+\end{figure}
+
+\subsection{Booking and Payment}
+
+After selecting a trip, the passenger confirms the number of seats and reviews the total amount, the student discount (if applicable), and the prepayment. The confirmation is only accepted once the prepayment has been successfully registered.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{web_booking.png}
+    \caption{Booking confirmation with prepayment}
+    \label{fig:web_booking}
+\end{figure}
+
+\subsection{Administration Panel}
+
+The administration panel is reserved for platform operators. It provides an overview of the global activity across seven tabs: users, rides, verifications, complaints, organizations, driver applications, and student domain management.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{web_admin.png}
+    \caption{Administration panel}
+    \label{fig:web_admin}
+\end{figure}
+
+\section*{Conclusion}
+
+This chapter described the realization of the web platform of ForsaDrive, from the development environment and the technological stack to the main delivered interfaces. The PHP and SQLite combination allowed the business logic and the database to be shared directly with the mobile application without any duplication. The resulting web application covers the primary workflows needed by passengers, drivers, and administrators. The following chapter focuses on the mobile counterpart, which shares the same backend and completes the user experience on the go.

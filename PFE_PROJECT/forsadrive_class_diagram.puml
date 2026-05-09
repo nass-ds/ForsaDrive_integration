@@ -1,0 +1,494 @@
+@startuml ForsaDrive_ClassDiagram
+' ===== VISUAL & LAYOUT SETTINGS =====
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 50
+skinparam class {
+    BackgroundColor LightYellow
+    BorderColor Black
+    ArrowColor Black
+}
+
+' ===== USERS & PROFILES =====
+
+together {
+    class User {
+        - id: Integer
+        - email: String
+        - phone: String
+        - passwordHash: String
+        - firstName: String
+        - lastName: String
+        - gender: Enum {MALE, FEMALE}
+        - dateOfBirth: Date
+        - role: Enum {PASSENGER, DRIVER, ADMIN, HELPDESK}
+        - profilePicture: String
+        - governorate: String
+        - balance: Decimal
+        - isDriver: Boolean
+        - isStudent: Boolean
+        - isAdmin: Boolean
+        - isHelpdeskAgent: Boolean
+        - isSuspended: Boolean
+        - createdAt: DateTime
+        --
+        + register()
+        + login()
+        + logout()
+        + updateProfile()
+        + topUpWallet(amount: Decimal)
+        + suspend()
+        + unsuspend()
+    }
+
+    class UserPreferences {
+        - id: Integer
+        - userId: Integer
+        - prefersMusic: Boolean
+        - prefersConversation: Boolean
+        - smokingTolerance: Boolean
+        - hasWifi: Boolean
+        - hasCharger: Boolean
+        --
+        + update()
+        + calculateCompatibility()
+    }
+}
+
+together {
+    class DriverProfile {
+        - id: Integer
+        - userId: Integer
+        - reliabilityScore: Float
+        - totalTripsCompleted: Integer
+        - totalCancellations: Integer
+        - avgRating: Float
+        - completionRate: Float
+        --
+        + calculateReliabilityScore()
+        + getAnalytics()
+        + getRecommendations()
+    }
+
+    class DriverApplication {
+        - id: Integer
+        - userId: Integer
+        - cin: String
+        - licenseNumber: String
+        - yearsExperience: Integer
+        - vehicleMake: String
+        - vehicleModel: String
+        - vehicleYear: Integer
+        - vehicleColor: String
+        - plateNumber: String
+        - seats: Integer
+        - hasAc: Boolean
+        - notes: String
+        - status: Enum {PENDING, APPROVED, REJECTED}
+        - rejectionReason: String
+        - createdAt: DateTime
+        --
+        + submit()
+        + approve()
+        + reject()
+    }
+
+    class Vehicle {
+        - id: Integer
+        - userId: Integer
+        - make: String
+        - model: String
+        - year: Integer
+        - color: String
+        - plateNumber: String
+        - seats: Integer
+        - hasAc: Boolean
+        - hasWifi: Boolean
+        - hasMusic: Boolean
+        - isAccessible: Boolean
+        - photoUrl: String
+        --
+        + add()
+        + update()
+        + delete()
+    }
+}
+
+' ===== STUDENT VERIFICATION =====
+
+together {
+    class StudentVerification {
+        - id: Integer
+        - userId: Integer
+        - universityEmail: String
+        - emailDomain: String
+        - status: Enum {PENDING, APPROVED, REJECTED}
+        - method: Enum {EMAIL_OTP, MANUAL}
+        - verifiedAt: DateTime
+        - rejectionReason: String
+        --
+        + submitOtp()
+        + approve()
+        + reject()
+    }
+
+    class StudentOtpCode {
+        - id: Integer
+        - userId: Integer
+        - email: String
+        - code: String
+        - expiresAt: DateTime
+        - attempts: Integer
+        --
+        + generate()
+        + verify()
+        + expire()
+    }
+
+    class StudentDomain {
+        - id: Integer
+        - domain: String
+        - label: String
+        - isActive: Boolean
+        - createdAt: DateTime
+        --
+        + activate()
+        + deactivate()
+        + isStudentEmail(email: String): Boolean
+    }
+}
+
+' ===== RIDES & BOOKINGS =====
+
+together {
+    class Ride {
+        - id: Integer
+        - driverId: Integer
+        - vehicleId: Integer
+        - fromLocation: String
+        - toLocation: String
+        - departureTime: DateTime
+        - price: Decimal
+        - availableSeats: Integer
+        - totalSeats: Integer
+        - status: Enum {ACTIVE, IN_PROGRESS, COMPLETED, CANCELLED}
+        - isBoosted: Boolean
+        - boostExpiresAt: DateTime
+        - notes: String
+        - createdAt: DateTime
+        --
+        + create()
+        + cancel()
+        + markDeparture()
+        + markArrival()
+        + boost()
+    }
+
+    class Booking {
+        - id: Integer
+        - rideId: Integer
+        - passengerId: Integer
+        - seats: Integer
+        - totalPrice: Decimal
+        - paidAmount: Decimal
+        - cashDue: Decimal
+        - paymentStatus: Enum {PENDING, PAID, CASH_COLLECTED}
+        - status: Enum {PENDING, CONFIRMED, CANCELLED, COMPLETED}
+        - discountApplied: Boolean
+        - isGroupBooking: Boolean
+        - createdAt: DateTime
+        --
+        + book()
+        + confirm()
+        + cancel()
+        + complete()
+        + applyStudentDiscount()
+        + collectCash()
+    }
+}
+
+together {
+    class GroupBooking {
+        - id: Integer
+        - bookingId: Integer
+        - organizerId: Integer
+        - totalMembers: Integer
+        - createdAt: DateTime
+        --
+        + create()
+        + trackPayments()
+    }
+
+    class GroupMember {
+        - id: Integer
+        - groupBookingId: Integer
+        - name: String
+        - phone: String
+        - shareAmount: Decimal
+        - paid: Boolean
+        --
+        + confirmPayment()
+    }
+}
+
+' ===== PAYMENTS & RATINGS =====
+
+together {
+    class Payment {
+        - id: Integer
+        - userId: Integer
+        - bookingId: Integer
+        - amount: Decimal
+        - type: Enum {BOOKING, REFUND, TOPUP, BOOST, ADJUST}
+        - note: String
+        - createdAt: DateTime
+        --
+        + process()
+        + refund()
+    }
+
+    class Rating {
+        - id: Integer
+        - rideId: Integer
+        - reviewerId: Integer
+        - revieweeId: Integer
+        - reviewerRole: Enum {PASSENGER, DRIVER}
+        - score: Integer
+        - comment: String
+        - createdAt: DateTime
+        --
+        + submit()
+        + updateAverageRating()
+    }
+
+    class Complaint {
+        - id: Integer
+        - complainantId: Integer
+        - rideId: Integer
+        - type: String
+        - description: String
+        - status: Enum {PENDING, RESOLVED, DISMISSED}
+        - adminResponse: String
+        - resolvedAt: DateTime
+        --
+        + submit()
+        + resolve()
+        + dismiss()
+    }
+}
+
+' ===== FEED & SOCIAL =====
+
+together {
+    class FeedPost {
+        - id: Integer
+        - authorId: Integer
+        - rideId: Integer
+        - type: Enum {DRIVER_OFFER, PASSENGER_REQUEST, GROUP}
+        - origin: String
+        - destination: String
+        - departureTime: DateTime
+        - seatsAvailable: Integer
+        - pricePerSeat: Decimal
+        - isBoosted: Boolean
+        - likesCount: Integer
+        - commentsCount: Integer
+        - status: Enum {ACTIVE, FULFILLED, EXPIRED}
+        - createdAt: DateTime
+        --
+        + create()
+        + like()
+        + comment()
+        + boost()
+        + bookFromPost()
+    }
+
+    class FeedInteraction {
+        - id: Integer
+        - postId: Integer
+        - userId: Integer
+        - type: Enum {LIKE, COMMENT}
+        - commentText: String
+        - createdAt: DateTime
+        --
+        + record()
+    }
+}
+
+' ===== MESSAGING =====
+
+together {
+    class Conversation {
+        - id: Integer
+        - userAId: Integer
+        - userBId: Integer
+        - createdAt: DateTime
+        --
+        + create()
+        + getMessages()
+    }
+
+    class Message {
+        - id: Integer
+        - conversationId: Integer
+        - senderId: Integer
+        - body: String
+        - isRead: Boolean
+        - sentAt: DateTime
+        --
+        + send()
+        + markRead()
+    }
+
+    class Notification {
+        - id: Integer
+        - userId: Integer
+        - type: String
+        - title: String
+        - body: String
+        - isRead: Boolean
+        - relatedUserId: Integer
+        - createdAt: DateTime
+        --
+        + send()
+        + markRead()
+    }
+}
+
+' ===== HELPDESK =====
+
+together {
+    class HelpdeskConversation {
+        - id: Integer
+        - userId: Integer
+        - agentId: Integer
+        - subject: String
+        - status: Enum {OPEN, IN_PROGRESS, RESOLVED}
+        - isEscalated: Boolean
+        - createdAt: DateTime
+        --
+        + open()
+        + escalate()
+        + resolve()
+    }
+
+    class HelpdeskMessage {
+        - id: Integer
+        - conversationId: Integer
+        - senderId: Integer
+        - senderType: Enum {USER, AGENT, BOT}
+        - body: String
+        - createdAt: DateTime
+        --
+        + send()
+    }
+}
+
+' ===== ORGANIZATIONS =====
+
+together {
+    class Organization {
+        - id: Integer
+        - name: String
+        - type: String
+        - contactEmail: String
+        - discountCode: String
+        - discountPercentage: Integer
+        - status: Enum {PENDING, APPROVED, REJECTED}
+        - rejectionReason: String
+        - createdAt: DateTime
+        --
+        + apply()
+        + approve()
+        + reject()
+        + generateDiscountCode()
+    }
+
+    class OrgMember {
+        - id: Integer
+        - organizationId: Integer
+        - name: String
+        - email: String
+        - phone: String
+        - role: Enum {ADMIN, MANAGER, MEMBER}
+        --
+        + add()
+        + remove()
+    }
+}
+
+' ===== ANALYTICS =====
+
+together {
+    class DriverAnalytics {
+        - driverId: Integer
+        - completionRate: Decimal
+        - cancellationRate: Decimal
+        - avgRating: Decimal
+        - totalRevenue: Decimal
+        - reliabilityScore: Integer
+        - recommendations: JSON
+        --
+        + generateReport()
+        + getSmartRecommendations()
+    }
+
+    class MatchHistory {
+        - id: Integer
+        - passengerId: Integer
+        - driverId: Integer
+        - matchScore: Integer
+        - geographicScore: Integer
+        - historyScore: Integer
+        - preferenceScore: Integer
+        - reliabilityScore: Integer
+        - ratingScore: Integer
+        - calculatedAt: DateTime
+        --
+        + recordMatch()
+    }
+}
+
+' ===== RELATIONSHIPS =====
+
+User "1" -- "0..1" DriverProfile      : has >
+User "1" -- "0..*" Vehicle            : owns >
+User "1" -- "0..1" UserPreferences    : has >
+User "1" -- "0..*" DriverApplication  : submits >
+
+DriverProfile "1" -- "0..*" Ride      : offers >
+DriverProfile "1" -- "0..1" DriverAnalytics : generates >
+
+Ride "0..*" -- "1" Vehicle            : uses >
+Ride "1" -- "0..*" Booking            : has >
+Ride "1" -- "0..1" FeedPost           : posted as >
+
+Booking "1" -- "0..*" Payment         : triggers >
+Booking "1" -- "0..1" GroupBooking    : extends to >
+GroupBooking "1" *-- "1..*" GroupMember : contains >
+
+User "1" -- "0..*" StudentVerification : has >
+StudentVerification "0..*" -- "1" StudentDomain : matched by >
+User "1" -- "0..1" StudentOtpCode    : has active >
+
+User "1" -- "0..*" Rating             : submits >
+Ride "1" -- "0..*" Rating             : receives >
+Ride "1" -- "0..*" Complaint          : reported in >
+
+User "1" -- "0..*" FeedPost           : creates >
+FeedPost "1" *-- "0..*" FeedInteraction : has >
+
+User "2" -- "0..*" Conversation       : participates >
+Conversation "1" *-- "0..*" Message   : contains >
+
+User "1" -- "0..*" HelpdeskConversation : opens >
+HelpdeskConversation "1" *-- "0..*" HelpdeskMessage : contains >
+
+User "1" -- "0..*" Notification       : receives >
+
+Organization "1" *-- "0..*" OrgMember : has >
+
+MatchHistory "0..*" -- "1" User       : involves >
+
+@enduml
