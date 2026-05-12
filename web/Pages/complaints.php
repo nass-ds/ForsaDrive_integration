@@ -3,10 +3,7 @@ require_once '../server/session.php';
 require_once '../server/language.php';
 require_once '../classes/complaints.php';
 
-if (!isLoggedIn()) {
-    header('Location: login.php');
-    exit();
-}
+requireRegularUser();
 
 $db     = getDB();
 $userId = (int)$_SESSION['user_id'];

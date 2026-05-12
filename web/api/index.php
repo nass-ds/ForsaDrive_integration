@@ -56,6 +56,9 @@ switch ($group) {
     case 'ratings':
         require __DIR__ . '/ratings.php';
         break;
+    case 'feed':
+        require __DIR__ . '/feed.php';
+        break;
     case 'admin':
         require __DIR__ . '/admin_api.php';
         break;

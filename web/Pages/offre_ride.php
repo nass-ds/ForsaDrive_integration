@@ -4,7 +4,7 @@ require_once '../server/language.php';
 require_once '../classes/rides.php';
 require_once '../classes/users.php';
 
-if (!isLoggedIn()) { header('Location: login.php'); exit(); }
+requireRegularUser();
 
 $db          = getDB();
 $currentUser = getCurrentUser();

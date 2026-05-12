@@ -37,6 +37,25 @@ function logoutUser(): void {
 function isLoggedIn(): bool {
     return isset($_SESSION['user_id']);
 }
+
+function isAdmin(): bool {
+    return isLoggedIn() && !empty($_SESSION['user_data']['is_admin']);
+}
+
+// Use at the top of every normal user page.
+// Admins are always redirected to admin.php — they must use a separate account for regular features.
+function requireRegularUser(string $loginRedirect = 'login.php', string $adminRedirect = 'admin.php'): void {
+    if (!isLoggedIn()) { header("Location: $loginRedirect"); exit(); }
+    if (isAdmin())     { header("Location: $adminRedirect"); exit(); }
+}
+
+// Use at the top of driver-only pages.
+function requireDriver(string $loginRedirect = 'login.php', string $adminRedirect = 'admin.php'): void {
+    requireRegularUser($loginRedirect, $adminRedirect);
+    if (empty($_SESSION['user_data']['is_driver'])) {
+        header("Location: home.php"); exit();
+    }
+}
 function refreshUserInSession(User $currentUser): void {
     if (!isLoggedIn()) {
         return;

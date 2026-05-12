@@ -2,7 +2,7 @@
 require_once '../server/session.php';
 require_once '../server/language.php';
 
-if (!isLoggedIn()) { header('Location: login.php'); exit(); }
+requireRegularUser();
 
 $db  = getDB();
 $uid = $_SESSION['user_data']['id'];

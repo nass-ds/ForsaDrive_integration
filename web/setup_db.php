@@ -2,9 +2,12 @@
 /**
  * ForsaDrive — Complete Database Reset & Rebuild
  * ⚠️  THIS DROPS ALL EXISTING DATA — run only to start fresh.
- * Visit: http://localhost/ForsaDrive/setup_db.php?confirm=yes
+ * Web:  http://localhost/ForsaDrive/setup_db.php?confirm=yes
+ * CLI:  php setup_db.php --confirm
  */
-if (!isset($_GET['confirm']) || $_GET['confirm'] !== 'yes') { ?>
+$cliConfirm = (PHP_SAPI === 'cli') && in_array('--confirm', $argv ?? [], true);
+$webConfirm = isset($_GET['confirm']) && $_GET['confirm'] === 'yes';
+if (!$cliConfirm && !$webConfirm) { ?>
 <!DOCTYPE html><html><head><meta charset="UTF-8"><title>ForsaDrive — DB Reset</title>
 <style>
     body { font-family: 'Segoe UI', sans-serif; background:#f0f4f8; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; }
@@ -46,6 +49,7 @@ $pdo->exec("PRAGMA journal_mode = WAL");
 
 // ── 2. Drop everything ───────────────────────────────────────────────────────
 $drops = [
+    'feed_comments','feed_likes','feed_posts',
     'helpdesk_messages','helpdesk_conversations',
     'org_members','organizations',
     'student_verifications','driver_profiles',
@@ -82,6 +86,12 @@ CREATE TABLE users (
     address              TEXT,
     governorate          TEXT,
     municipality         TEXT,
+    student_email        TEXT,
+    student_status       TEXT DEFAULT 'none'
+                         CHECK (student_status IN ('none','pending','approved','rejected')),
+    student_verified_at  DATETIME,
+    referral_code        TEXT UNIQUE,
+    referred_by          INTEGER REFERENCES users(id) ON DELETE SET NULL,
     suspended            INTEGER DEFAULT 0,
     ban_reason           TEXT,
     created_at           DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -286,6 +296,44 @@ CREATE TABLE helpdesk_messages (
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 )", "Create helpdesk_messages", $ok, $err);
 
+// ── 3b. Community feed (matches mobile FeedScreen) ───────────────────────────
+run($pdo, "
+CREATE TABLE feed_posts (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type            TEXT NOT NULL DEFAULT 'driver_offer'
+                    CHECK (type IN ('driver_offer','passenger_request','group_post')),
+    content         TEXT NOT NULL,
+    from_location   TEXT,
+    to_location     TEXT,
+    departure_date  DATE,
+    seats           INTEGER DEFAULT 1,
+    ride_id         INTEGER REFERENCES rides(id) ON DELETE SET NULL,
+    is_boosted      INTEGER DEFAULT 0,
+    boosted_at      DATETIME,
+    likes_count     INTEGER DEFAULT 0,
+    comments_count  INTEGER DEFAULT 0,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+)", "Create feed_posts", $ok, $err);
+
+run($pdo, "
+CREATE TABLE feed_likes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id     INTEGER NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(post_id, user_id)
+)", "Create feed_likes", $ok, $err);
+
+run($pdo, "
+CREATE TABLE feed_comments (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id     INTEGER NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body        TEXT NOT NULL,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+)", "Create feed_comments", $ok, $err);
+
 // ── 4. Indexes ───────────────────────────────────────────────────────────────
 $indexes = [
     "CREATE INDEX idx_rides_driver    ON rides(driver_id, status)",
@@ -300,6 +348,10 @@ $indexes = [
     "CREATE INDEX idx_org_domain      ON organizations(email_domain)",
     "CREATE INDEX idx_vehicles_user   ON vehicles(user_id)",
     "CREATE INDEX idx_ratings_to      ON ratings(to_user_id)",
+    "CREATE INDEX idx_feed_user       ON feed_posts(user_id, created_at)",
+    "CREATE INDEX idx_feed_type       ON feed_posts(type, is_boosted DESC, created_at DESC)",
+    "CREATE INDEX idx_feed_likes_post ON feed_likes(post_id)",
+    "CREATE INDEX idx_feed_comments_post ON feed_comments(post_id, created_at)",
 ];
 foreach ($indexes as $idx) run($pdo, $idx, "Index", $ok, $err);
 

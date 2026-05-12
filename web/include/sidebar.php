@@ -99,7 +99,9 @@ function navLink(string $href, string $icon, string $label, string $cur, string 
 
     <nav class="mt-2 pb-4">
         <div class="nav-section-label">Main</div>
-        <?= navLink('interface.php', 'home', 'Dashboard', $cur, 'interface.php') ?>
+        <?= navLink('home.php', 'house-user', 'Home', $cur, 'home.php') ?>
+        <?= navLink('feed.php', 'stream', 'Community Feed', $cur, 'feed.php') ?>
+        <?= navLink('interface.php', 'th-large', 'Dashboard', $cur, 'interface.php') ?>
         <?= navLink('book_ride.php', 'search', 'Search Rides', $cur, 'book_ride.php') ?>
         <?= navLink('my_rides.php', 'car', 'My Rides', $cur, 'my_rides.php') ?>
 

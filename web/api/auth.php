@@ -20,6 +20,9 @@ switch ($method . ':' . $action) {
         if (!empty($user['suspended'])) {
             json_error('Account suspended: ' . ($user['ban_reason'] ?? 'Contact support'), 403);
         }
+        if (!empty($user['is_admin'])) {
+            json_error('Admin accounts can only access the web panel. Please use the website to log in.', 403);
+        }
         $token = generate_token((int)$user['id']);
         json_ok(['token' => $token, 'user' => user_payload($user)]);
     }

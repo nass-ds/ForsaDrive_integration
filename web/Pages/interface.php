@@ -3,7 +3,7 @@ require_once __DIR__ . '/../server/session.php';
 require_once __DIR__ . '/../server/language.php';
 require_once __DIR__ . '/../classes/rides.php';
 
-if (!isLoggedIn()) { header("Location: login.php"); exit(); }
+requireRegularUser();
 
 $db   = getDB();
 $ud   = $_SESSION['user_data'];

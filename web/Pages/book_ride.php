@@ -5,7 +5,7 @@ require_once '../classes/rides.php';
 require_once '../classes/bookings.php';
 require_once '../classes/notifications.php';
 
-if (!isLoggedIn()) { header('Location: login.php'); exit(); }
+requireRegularUser();
 
 $db   = getDB();
 $ride = new Ride($db);

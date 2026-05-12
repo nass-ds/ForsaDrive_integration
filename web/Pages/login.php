@@ -3,7 +3,7 @@ require_once '../server/session.php';
 
 // Redirect if already logged in
 if (isLoggedIn()) {
-    header('Location: interface.php');
+    header('Location: home.php');
     exit();
 }
 
@@ -19,7 +19,9 @@ $flashMsg   = '';
 
 // ── POST: process login ────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email    = trim($_POST['email']    ?? '');
+    // Lowercase the email — the Dart API and the PHP /auth/signup both store
+    // emails lowercased, so the WHERE clause has to match that.
+    $email    = strtolower(trim($_POST['email'] ?? ''));
     $password = $_POST['password']      ?? '';
     $captcha  = (int)($_POST['captcha'] ?? -1);
 
@@ -70,11 +72,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'governorate'       => $user['governorate'] ?? '',
                     ];
 
-                    // Admin → admin panel, else → main interface
+                    // Admin → admin panel, else → home (post-login landing)
                     if (!empty($user['is_admin'])) {
                         header('Location: admin.php');
                     } else {
-                        header('Location: interface.php');
+                        header('Location: home.php');
                     }
                     exit();
                 }

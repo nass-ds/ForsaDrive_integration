@@ -3,11 +3,7 @@ require_once '../server/session.php';
 require_once '../server/language.php';
 require_once '../classes/rides.php';
 
-// Redirect if not logged in or not a driver
-if (!isLoggedIn() || empty($_SESSION['user_data']['is_driver'])) {
-    header('Location: interface.php');
-    exit();
-}
+requireDriver();
 
 $db     = getDB();
 $userId = (int)$_SESSION['user_data']['id'];

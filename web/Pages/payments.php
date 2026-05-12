@@ -4,7 +4,7 @@ require_once '../server/language.php';
 require_once '../classes/users.php';
 require_once '../classes/payments.php';
 
-if (!isLoggedIn()) { header('Location: login.php'); exit(); }
+requireRegularUser();
 
 $db  = getDB();
 $uid = $_SESSION['user_id'];
