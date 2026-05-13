@@ -7,32 +7,30 @@ if (isLoggedIn()) {
     exit();
 }
 
-// Generate CAPTCHA on first GET load only — validation reads stored values before regenerating
-if (!isset($_SESSION['captcha_a'])) {
-    $_SESSION['captcha_a'] = random_int(1, 9);
-    $_SESSION['captcha_b'] = random_int(1, 9);
+// Use login-specific keys so signup's captcha regeneration never interferes.
+// Regenerate only on GET — on POST we read the stored values first, then refresh.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $_SESSION['login_cap_a'] = random_int(1, 9);
+    $_SESSION['login_cap_b'] = random_int(1, 9);
 }
 
-$errors     = [];
-$flashType  = '';   // 'success' | 'error'
-$flashMsg   = '';
+$errors    = [];
+$flashType = '';
+$flashMsg  = '';
 
 // ── POST: process login ────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Lowercase the email — the Dart API and the PHP /auth/signup both store
-    // emails lowercased, so the WHERE clause has to match that.
     $email    = strtolower(trim($_POST['email'] ?? ''));
-    $password = $_POST['password']      ?? '';
+    $password = $_POST['password'] ?? '';
     $captcha  = (int)($_POST['captcha'] ?? -1);
 
-    // CAPTCHA first
-    if ($captcha !== ($_SESSION['captcha_a'] + $_SESSION['captcha_b'])) {
+    if ($captcha !== (int)$_SESSION['login_cap_a'] + (int)$_SESSION['login_cap_b']) {
         $errors[] = 'Incorrect answer to the security question.';
     }
 
-    // Regenerate after attempt
-    $_SESSION['captcha_a'] = random_int(1, 9);
-    $_SESSION['captcha_b'] = random_int(1, 9);
+    // Refresh for next attempt
+    $_SESSION['login_cap_a'] = random_int(1, 9);
+    $_SESSION['login_cap_b'] = random_int(1, 9);
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Please enter a valid email address.';
@@ -92,8 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$captchaA   = $_SESSION['captcha_a'];
-$captchaB   = $_SESSION['captcha_b'];
+$captchaA   = (int)($_SESSION['login_cap_a'] ?? 1);
+$captchaB   = (int)($_SESSION['login_cap_b'] ?? 1);
 $registered = isset($_GET['registered']);
 $oldEmail   = htmlspecialchars($_POST['email'] ?? '');
 ?>
@@ -344,7 +342,7 @@ $oldEmail   = htmlspecialchars($_POST['email'] ?? '');
                     <i class="fa fa-robot me-1 text-primary"></i>Security check:
                     What is <strong><?= $captchaA ?></strong> + <strong><?= $captchaB ?></strong>?
                 </div>
-                <input type="number" name="captcha" class="form-control"
+                <input type="number" name="captcha" id="captchaField" class="form-control"
                        style="max-width:130px;" placeholder="Your answer"
                        min="0" max="18" required>
             </div>
@@ -385,7 +383,6 @@ document.getElementById('togglePass').addEventListener('click', function () {
 document.getElementById('loginForm').addEventListener('submit', function (e) {
     const email = this.querySelector('[name=email]').value.trim();
     const pass  = this.querySelector('[name=password]').value;
-    const cap   = this.querySelector('[name=captcha]').value.trim();
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         e.preventDefault();
@@ -397,6 +394,7 @@ document.getElementById('loginForm').addEventListener('submit', function (e) {
         alert('Password is required.');
         return;
     }
+    const cap = document.getElementById('captchaField').value.trim();
     if (!cap) {
         e.preventDefault();
         alert('Please answer the security question.');

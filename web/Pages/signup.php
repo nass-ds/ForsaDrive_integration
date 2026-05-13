@@ -20,7 +20,7 @@ $oldInput = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ── collect & sanitise ────────────────────────────────────────────
     $username     = trim($_POST['username']     ?? '');
-    $email        = trim($_POST['email']        ?? '');
+    $email        = strtolower(trim($_POST['email'] ?? ''));
     $dob          = trim($_POST['dob']          ?? '');
     $gender       = trim($_POST['gender']       ?? '');
     $phone        = trim($_POST['phone']        ?? '');
