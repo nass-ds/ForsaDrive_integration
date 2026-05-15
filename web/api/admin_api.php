@@ -5,6 +5,47 @@
 
 $action = $segments[1] ?? '';
 
+// ── Organizations (list + review) ─────────────────────────────────────────────
+if ($action === 'organizations') {
+    require_admin();
+    $pdo = db();
+    $orgId = isset($segments[2]) && is_numeric($segments[2]) ? (int)$segments[2] : null;
+    $sub   = $segments[3] ?? '';
+
+    if ($method === 'GET' && $orgId === null) {
+        $stmt = $pdo->prepare("SELECT * FROM organizations ORDER BY created_at DESC");
+        $stmt->execute();
+        json_ok(['organizations' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    }
+
+    if ($method === 'POST' && $orgId !== null && $sub === 'review') {
+        $b           = require_fields(['action']);
+        $reviewAction = $b['action']; // 'approved' or 'rejected'
+        $reason      = $b['rejection_reason'] ?? null;
+
+        if (!in_array($reviewAction, ['approved', 'rejected'], true)) {
+            json_error('Invalid action', 400);
+        }
+
+        $newStatus = ($reviewAction === 'approved') ? 'active' : 'suspended';
+        $note      = ($reviewAction === 'rejected' && $reason)
+                       ? "Rejected: $reason"
+                       : null;
+
+        $stmt = $pdo->prepare("UPDATE organizations SET status=?, notes=COALESCE(?, notes) WHERE id=?");
+        $stmt->execute([$newStatus, $note, $orgId]);
+
+        if ($stmt->rowCount() === 0) json_error('Organization not found', 404);
+
+        json_ok([
+            'message' => "Organization $reviewAction",
+            'status'  => $newStatus,
+        ]);
+    }
+
+    json_error('Method not allowed', 405);
+}
+
 // ── Student domains (GET, POST, DELETE) ───────────────────────────────────────
 if ($action === 'student-domains') {
     $admin = require_admin();

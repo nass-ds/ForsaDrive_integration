@@ -27,3 +27,13 @@ Thumbs.db
 *.log
 *.tmp
 node_modules/
+
+# ── Editor / tool metadata ────────────────────────────────────────────────────
+.qodo/
+.claude/
+.cursor/
+CLAUDE.md
+.aider*
+
+# ── Local duplicate working copy of the report (not for the repo) ─────────────
+PFE_PROJECT__1_/

@@ -107,7 +107,9 @@ class _UserMenu extends StatelessWidget {
             case 'vehicles': context.go('/vehicles'); break;
             case 'organizations': context.go('/organizations'); break;
             case 'helpdesk': context.go('/helpdesk'); break;
-            case 'logout': context.read<AuthProvider>().logout().then((_) => context.go('/login')); break;
+            case 'logout': context.read<AuthProvider>().logout().then((_) {
+              if (context.mounted) context.go('/login');
+            }); break;
           }
         },
         itemBuilder: (_) => [

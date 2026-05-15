@@ -7,6 +7,29 @@ $action    = $segments[1] ?? '';
 $bookingId = is_numeric($action) ? (int)$action : null;
 $subAction = $segments[2] ?? '';
 
+// POST /bookings/validate-promo — look up an organizational discount code
+if ($method === 'POST' && $action === 'validate-promo') {
+    auth_user();
+    $b    = require_fields(['code']);
+    $code = strtoupper(trim($b['code']));
+    if ($code === '') json_error('Promo code is required', 400);
+
+    $stmt = db()->prepare("
+        SELECT id, name, discount_percent
+        FROM organizations
+        WHERE UPPER(discount_code) = ? AND status = 'active'
+    ");
+    $stmt->execute([$code]);
+    $org = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$org) json_error('Promo code is invalid or expired', 404);
+
+    json_ok([
+        'discount_percent' => (int)$org['discount_percent'],
+        'org_name'         => $org['name'],
+        'code'             => $code,
+    ]);
+}
+
 // POST /bookings — create booking
 if ($method === 'POST' && $action === '') {
     $user = auth_user();
@@ -40,6 +63,20 @@ if ($method === 'POST' && $action === '') {
     $price  = (float)$ride['price'] * $seats;
     $isStudent = !empty($user['is_student']);
     if ($isStudent) $price *= 0.5; // 50% student discount
+
+    // Optional organizational promo code (applied AFTER the student discount)
+    $promoCode = isset($b['promo_code']) ? strtoupper(trim($b['promo_code'])) : '';
+    if ($promoCode !== '') {
+        $orgStmt = $pdo->prepare("
+            SELECT discount_percent FROM organizations
+            WHERE UPPER(discount_code) = ? AND status = 'active'
+        ");
+        $orgStmt->execute([$promoCode]);
+        $promoPct = (int)($orgStmt->fetchColumn() ?: 0);
+        if ($promoPct > 0) {
+            $price *= max(0.0, 1 - $promoPct / 100);
+        }
+    }
 
     $uBalance = (float)$user['balance'];
     if ($uBalance < $price) { $pdo->rollBack(); json_error('Insufficient balance', 402); }

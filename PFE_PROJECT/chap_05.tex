@@ -1,198 +1,188 @@
 %=============================================================================
-%  CHAPTER 5 — REALIZATION OF THE MOBILE APPLICATION
+%  CHAPTER 5 — RELEASE 2: SPRINT 3 (PAYMENTS & INTELLIGENCE) AND SPRINT 4
+%               (COMMUNITY & FINALIZATION) + TESTING AND DEPLOYMENT
 %=============================================================================
-\chapter{Realization of the Mobile Application}
+\chapter{Release 2: Payments, Intelligence, Community, and Finalization}
 
 \clearpage
 \section*{Introduction}
 
-The mobile application extends the reach of ForsaDrive by making the service available from any smartphone. Because carpooling is, by nature, something users organize on the move --- while leaving a class, waiting for a colleague, or standing at a louage station --- the mobile experience was treated as a first-class citizen and not as an afterthought. This chapter describes the technologies that were used to build it, the features that only make sense on a mobile device, and the main screens delivered at the end of the project. It closes with the testing strategy that was applied to the entire platform.
+The second release of ForsaDrive picks up where the first one left off. By the end of chapter~4 the platform supported the core booking loop, but a number of features that turn a working prototype into a usable product were still missing: a wallet that consolidates the financial activity of a user, the analytics that drivers need to understand their performance, the community features that make a carpooling application attractive to return to, and the multilingual interface that the Tunisian context requires. Sprint~3 was dedicated to the \textit{Payments and Intelligence} side of this work, and Sprint~4 covered the \textit{Community and Finalization} side, including the testing strategy and the deployment of the application. This chapter follows the same structure as the previous one --- backlog, detailed conception when relevant, realization, sprint review --- and closes with the testing approach that was applied to the entire platform and a brief description of the deployment.
 
+\section{Sprint 3 --- Payments and Intelligence}
 
-\section{Mobile Technologies}
+\subsection{Sprint Goal and Backlog}
 
-\subsection{Choice of a Cross-Platform Framework}
+The goal of Sprint~3 was twofold. On the one hand, the wallet had to be turned from a hidden internal mechanism into a screen that users can actually consult, with a clear distinction between the available balance, the pending amounts, and the history of operations. On the other hand, the platform needed enough intelligence to remain useful when the catalog of rides grows: a search that would return the result list in chronological order would quickly lose its relevance once the database contains more than a handful of trips. The backlog of the sprint is given in Table~\ref{tab:sprint3_backlog}.
 
-Two main options were considered for the mobile application: developing natively for Android and iOS on the one hand, or using a cross-platform framework on the other. Native development would have doubled the effort without providing enough additional value for a ride-sharing use case, so a cross-platform framework was preferred. After evaluating the alternatives against the time budget of the internship and the team's experience, \textbf{Flutter} was selected.
+\begin{table}[H]
+\centering
+\caption{Sprint 3 backlog}
+\label{tab:sprint3_backlog}
+\begin{tabular}{|c|p{8.5cm}|c|}
+\hline
+\textbf{ID} & \textbf{User story} & \textbf{Points} \\
+\hline
+US3.1 & As a user, I want to see my wallet balance, my pending amounts and the full history of my operations. & 5 \\
+\hline
+US3.2 & As a user, I want to top up my wallet so that I can pay the prepayment of my next bookings. & 3 \\
+\hline
+US3.3 & As a passenger, I want my fifty-percent student discount to be applied automatically once my account is verified. & 3 \\
+\hline
+US3.4 & As a passenger, I want to enter a promo code at booking time so that I get an additional discount when one is available. & 3 \\
+\hline
+US3.5 & As a driver, I want to boost a ride for a fixed fee so that it appears on top of the search and the feed. & 5 \\
+\hline
+US3.6 & As a driver, I want a dashboard that shows my reliability score, my revenue trend, and my rating distribution. & 8 \\
+\hline
+US3.7 & As a passenger, I want each ride to display a compatibility score so that I can quickly identify the offers that fit me. & 5 \\
+\hline
+US3.8 & As a system, I want to recompute the reliability score of a driver after every completed trip so that the indicator stays current. & 3 \\
+\hline
+\end{tabular}
+\end{table}
 
-Flutter is an open-source UI toolkit maintained by Google that allows a single Dart codebase to compile into genuinely native applications for Android, iOS, web, and desktop. Unlike JavaScript-based frameworks that bridge to native components at runtime, Flutter draws its own widgets using the Skia rendering engine, which gives it pixel-perfect consistency across platforms and excellent rendering performance. Its hot-reload feature also significantly accelerated the development cycle during the iterative sprints.
+\subsection{Detailed Conception}
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.3\textwidth]{flutter_logo.png}
-    \caption{Flutter logo}
-    \label{fig:flutter_logo}
-\end{figure}
+The most sensitive piece of this sprint is the price computation pipeline, since several rules apply on top of each other: the base price per seat, the seat count, the student discount, and an optional promo code. The order in which these reductions are applied directly affects the amount paid and refunded, which made it worth fixing on paper before any line of code was written. The team chose the following order, which was reviewed and accepted by the supervising engineer:
 
-\subsection{Supporting Libraries}
+\begin{enumerate}[noitemsep]
+    \item Start from $\textit{base price} = \textit{seat price} \times \textit{seat count}$.
+    \item If the passenger is a verified student, apply the fifty-percent student discount.
+    \item If a valid promo code is provided, apply its percentage on the result of step~2.
+    \item Compute the prepayment as fifty percent of the resulting amount.
+    \item Store on the booking row the original price, the applied discounts, the total to pay, the prepayment, and the remaining amount to settle in cash.
+\end{enumerate}
 
-Several packages were added to the Flutter project to cover the specific needs of the application.
+The reliability score of a driver is recomputed every time a trip is marked as completed. The formula combines the average rating, the completion rate, and the cancellation rate, each weighted by a coefficient that was tuned on a small set of synthetic histories. The exact weights are not detailed here as they are an implementation choice rather than a structural one, but the principle is the same throughout: the reliability score is a single number between zero and one hundred that summarizes how trustworthy a driver has been over recent trips.
 
-\begin{description}[noitemsep]
-    \item[go\_router] Manages declarative navigation between screens, deep links, and the bottom tab bar.
-    \item[provider] Implements the ChangeNotifier-based state management pattern, used for authentication state, locale, and ride data.
-    \item[dio / http] Consumes the REST API exposed by the PHP backend, with the bearer token attached globally through an interceptor.
-    \item[shared\_preferences] Persists the session token and the selected language locally on the device so that the user does not have to log in at every launch.
-    \item[flutter\_map] Renders interactive OpenStreetMap tiles and draws the route polyline between the origin and the destination of a ride.
-    \item[firebase\_messaging] Delivers push notifications for new bookings, confirmations, ride updates, and chat messages, even when the application is in the background.
-    \item[flutter\_localizations] Provides the full internationalization infrastructure for French, English, and Arabic, including automatic RTL layout flipping for Arabic.
-\end{description}
+The compatibility score that decorates each ride card on the search results is computed at the time of the search. It takes as input the geographic match (origin, destination), the shared history with the driver (number of past trips, average rating left), the alignment with the user's stated preferences (music, smoking tolerance, wifi), and the reliability of the driver. The four contributions are weighted and combined into a single percentage that the user can interpret at a glance.
 
-\section{Mobile-Specific Features}
+\subsection{Realization}
 
-Beyond mirroring the web experience, the mobile application takes advantage of features that only a phone can provide.
-
-\subsection{Push Notifications}
-
-Push notifications are delivered through Firebase Cloud Messaging. They inform the user of events that require attention: a new booking request for a driver, a booking confirmation or cancellation for a passenger, a ride departure, a new chat message, or an admin action on the account. Notifications are delivered even when the application is in the background, which matches the real usage patterns of the platform.
-
-\subsection{In-App Chat}
-
-The mobile application embeds a real-time messaging interface. Conversations are polled every three seconds to display new messages without requiring a persistent WebSocket connection. The interface shows date dividers, read receipts, and a typing indicator. Passengers and drivers can start a conversation directly from a booking notification without leaving the application.
-
-\subsection{Interactive Map}
-
-Each ride detail screen embeds a \texttt{FlutterMap} widget that geocodes the origin and destination city names using the Nominatim API and draws the driving route between them using the OSRM open routing service. Green and red markers indicate the pickup and drop-off points respectively.
-
-\subsection{Multilingual Interface}
-
-The application supports three languages --- French, English, and Arabic --- with a language picker accessible from the settings screen. Arabic triggers an automatic RTL layout flip through \texttt{GlobalWidgetsLocalizations}, so all padding, alignment, and navigation directions are mirrored without any manual override in the widget code.
-
-\section{Presentation of the Mobile Interfaces}
-
-The following screens illustrate the main paths inside the mobile application. Screens are shown in the order a typical passenger would go through them.
-
-\subsection{Authentication}
-
-The authentication screens cover login, registration, and student email OTP verification. The registration form includes a gender selector, a date-of-birth picker, and a real-time student domain detector that shows a green banner when the entered email belongs to a recognized university domain.
+The wallet screen consolidates the financial activity of the user: current balance, pending amounts, and the history of operations. Drivers see their earnings grouped by trip and can drill down to the individual booking that generated each entry (Figure~\ref{fig:mobile_wallet}). The promo code is entered at booking time on the trip detail screen of the mobile application, and its validity is checked through a dedicated backend endpoint before the prepayment is recomputed.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.6\textwidth]{mobile_auth.png}
-    \caption{Mobile authentication screens (login and registration)}
-    \label{fig:mobile_auth}
-\end{figure}
-
-\subsection{Home and Search}
-
-The home screen is centered on a search bar. Below it, three personalized sections are displayed: recommended rides based on the user's booking history (collaborative filtering), trending routes derived from recent bookings, and nearby rides matched to the user's governorate.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.6\textwidth]{mobile_home.png}
-    \caption{Home screen with personalized recommendations}
-    \label{fig:mobile_home}
-\end{figure}
-
-\subsection{Ride Search and Filters}
-
-The search results screen allows passengers to filter rides by price range, minimum driver rating, departure date, number of seats, and on-board amenities (air conditioning, Wi-Fi, music, accessibility). Each ride card displays a compatibility score badge showing how well the ride matches the passenger's profile and history.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.6\textwidth]{mobile_search.png}
-    \caption{Ride search results with filters and match score}
-    \label{fig:mobile_search}
-\end{figure}
-
-\subsection{Trip Details and Booking}
-
-After selecting a ride, the passenger reaches a detailed view that shows the route on an interactive map, the driver's profile and reliability score, and the price breakdown including the student discount when applicable. The booking is confirmed after the fifty-percent prepayment is deducted from the wallet.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.9\textwidth]{mobile_trip_details.png}
-    \caption{Trip details with map and booking confirmation}
-    \label{fig:mobile_trip_details}
-\end{figure}
-
-\subsection{Driver Dashboard}
-
-The driver dashboard is organized into two tabs. The overview tab shows active ride cards with departure and arrival action buttons. The analytics tab presents a reliability score gauge, a six-month revenue trend chart, a rating distribution bar chart, and smart improvement recommendations generated by the backend.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.9\textwidth]{mobile_driver_dashboard.png}
-    \caption{Driver dashboard with analytics and reliability score}
-    \label{fig:mobile_driver_dashboard}
-\end{figure}
-
-\subsection{Wallet}
-
-The wallet screen consolidates the financial activity of the user: current balance, pending amounts, and the history of operations. Drivers also see their earnings grouped by trip.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.6\textwidth]{mobile_wallet.png}
-    \caption{Wallet screen}
+    \includegraphics[width=0.55\textwidth]{mobile_wallet.png}
+    \caption{Wallet screen with balance and history}
     \label{fig:mobile_wallet}
 \end{figure}
 
-\subsection{Social Feed}
-
-The feed screen lets drivers post ride offers and passengers post travel requests. Posts can be liked, commented on, and used as a direct booking entry point through a quick-booking bottom sheet. Boosted posts appear at the top of the feed and are marked with a ``Boosted'' badge.
+The driver dashboard is organized into two tabs. The overview tab shows the active rides with departure and arrival action buttons. The analytics tab presents the reliability score gauge, a six-month revenue trend chart, the distribution of received ratings, and the set of improvement recommendations generated by the backend (Figure~\ref{fig:mobile_driver_dashboard}). The recommendations are not a black-box machine learning output: they are derived from a short set of rules that compare the driver's metrics with the average of the platform, which makes them explainable and easy to adjust.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.6\textwidth]{mobile_feed.png}
-    \caption{Social feed with ride posts and quick booking}
-    \label{fig:mobile_feed}
+    \includegraphics[width=0.85\textwidth]{mobile_driver_dashboard.png}
+    \caption{Driver dashboard --- analytics tab with reliability score}
+    \label{fig:mobile_driver_dashboard}
 \end{figure}
 
-\subsection{In-App Chat}
+\subsection{Sprint Review}
 
-The chat screen lists the conversations linked to active trips. Each conversation opens on a messaging view with a bubble layout, date dividers, and read receipts. Drivers can also open a conversation directly from a booking notification.
+The review at the end of Sprint~3 was the longest of the four. The supervising engineer asked for a demonstration of the price pipeline with several combinations of student status and promo codes, which forced the team to walk through the order of operations on the whiteboard. One bug was caught during this exercise: when both the student discount and a promo code applied, the promo was being computed on the original price rather than on the price already reduced by the student discount, which slightly favored the passenger. The order of operations was fixed the same evening and a unit test was added to lock it for the future. The retrospective also flagged that the explainable nature of the recommendation rules had been a good choice: every recommendation could be justified to a driver who would ask for the reasoning, which would not have been possible with a learned model.
+
+\section{Sprint 4 --- Community and Finalization}
+
+\subsection{Sprint Goal and Backlog}
+
+The goal of Sprint~4 was to add the features that turn a transactional booking platform into something users come back to even when they do not have an immediate trip in mind, and to perform the final stabilization of the application. The backlog is given in Table~\ref{tab:sprint4_backlog}.
+
+\begin{table}[H]
+\centering
+\caption{Sprint 4 backlog}
+\label{tab:sprint4_backlog}
+\begin{tabular}{|c|p{8.5cm}|c|}
+\hline
+\textbf{ID} & \textbf{User story} & \textbf{Points} \\
+\hline
+US4.1 & As a user, I want to chat in real time with the other party of my booking so that we coordinate the trip. & 5 \\
+\hline
+US4.2 & As a user, I want to receive push notifications when something requires my attention so that I do not miss it. & 3 \\
+\hline
+US4.3 & As a passenger or driver, I want to publish or browse posts on a social feed so that I can discover or advertise rides outside the search. & 8 \\
+\hline
+US4.4 & As a user, I want to rate the other party after a completed trip so that the community can rely on past feedback. & 3 \\
+\hline
+US4.5 & As a user, I want to file a complaint about another user or about a trip so that the administration can take action. & 5 \\
+\hline
+US4.6 & As a user, I want a HelpDesk that answers common questions instantly and escalates the rest to a human agent. & 5 \\
+\hline
+US4.7 & As a user, I want to switch the interface between French, English, and Arabic so that I can use the application in my preferred language. & 5 \\
+\hline
+US4.8 & As an admin, I want a single panel that gives me full control over users, rides, complaints, organizations, driver applications, and student domains. & 8 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Detailed Conception}
+
+The chat feature was deliberately kept simple. Rather than introducing a WebSocket server, which would have added an operational dependency that the deployment plan does not yet cover, the conversations are polled every three seconds. This poll-based approach is sufficient for the volumes targeted by the project and remains within the limits of what the SQLite backend can sustain. Read receipts and date dividers are computed on the client to keep the API surface small. The complaint and rating workflows reuse the existing booking entities and only add their own tables, which kept their conception light.
+
+The administration panel of Sprint~4 deserved more attention. Seven tabs were grouped under a single page, each backed by a dedicated handler on the backend, and each tab implements its own filters and actions. The challenge was less in the design of any individual tab than in the overall organization, since several actions trigger side effects that propagate to other parts of the system. The approval of an organizational account, for example, automatically grants the discount eligibility to all the email addresses registered under that organization.
+
+\subsection{Realization}
+
+Several screens illustrate the deliverables of Sprint~4. The chat screen lists the conversations linked to active trips and opens on a messaging view with bubbles, date dividers, and read receipts (Figure~\ref{fig:mobile_chat}). The social feed lets drivers publish ride offers and passengers publish travel requests, with likes, comments, and a quick-booking bottom sheet that shortens the path from a feed entry to a confirmed booking (Figure~\ref{fig:mobile_feed}). The HelpDesk opens a support conversation that is initially handled by a rule-based bot covering fourteen FAQ categories, with an explicit escalation to a human agent when the bot cannot resolve the issue (Figure~\ref{fig:mobile_helpdesk}).
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.6\textwidth]{mobile_chat.png}
-    \caption{In-app chat screen}
+    \includegraphics[width=0.55\textwidth]{mobile_chat.png}
+    \caption{Mobile --- in-app chat screen}
     \label{fig:mobile_chat}
 \end{figure}
 
-\subsection{HelpDesk with AI Bot}
-
-The HelpDesk screen opens a support conversation that is initially handled by a rule-based bot. The bot covers fourteen topic categories and responds instantly to common questions. When the bot cannot resolve the issue, it escalates the conversation to a human support agent and notifies the user.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.55\textwidth]{mobile_feed.png}
+    \caption{Mobile --- social feed with quick booking}
+    \label{fig:mobile_feed}
+\end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.6\textwidth]{aibot.png}
-    \caption{HelpDesk screen with AI bot and escalation to human agent}
+    \includegraphics[width=0.55\textwidth]{aibot.png}
+    \caption{HelpDesk --- AI bot with escalation to a human agent}
     \label{fig:mobile_helpdesk}
 \end{figure}
 
-\subsection{Profile and Settings}
-
-The profile screen gathers the personal information, the verification status including the student badge, the vehicle list, and the language selector. A driver application card shows the status of any pending driver registration request.
+The administration panel groups the seven tabs in a single page (Figure~\ref{fig:web_admin}). Each tab provides the data, the filters, and the actions that the corresponding workflow requires.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.6\textwidth]{mobile_profile.png}
-    \caption{Profile and settings screen}
-    \label{fig:mobile_profile}
+    \includegraphics[width=\textwidth]{web_admin.png}
+    \caption{Web --- administration panel with seven tabs}
+    \label{fig:web_admin}
 \end{figure}
+
+The multilingual interface is available on the mobile application. French, English, and Arabic can be selected from the language picker on the settings screen. Arabic triggers an automatic right-to-left layout flip through the Flutter localization infrastructure, so that all padding, alignment, and navigation directions are mirrored without any manual override in the widget code.
+
+\subsection{Sprint Review}
+
+The review at the end of Sprint~4 was also the closing review of the project. All user stories of the sprint backlog were accepted. Two minor remarks were noted for the future: the polling interval of the chat could be made adaptive (a longer interval when the conversation is idle and a shorter one when a message has just been sent), and the right-to-left flipping of Arabic was missing on a single non-localized icon button, which was fixed during the review itself. The retrospective for the project as a whole highlighted three things the team would do differently next time: agreeing on the API error format on the very first day of Sprint~0 instead of letting it emerge sprint after sprint, writing the unit tests of the price pipeline before its implementation rather than after, and taking the screenshots of each screen as soon as it was finished, instead of producing them all at once before writing this report.
 
 \section{Testing}
 
 Testing was carried out continuously during the implementation phase, rather than left to a final stage.
 
-\subsection{Unit Testing}
+\subsection{Unit Tests}
 
-Unit tests were written for the most sensitive business rules of the backend: the computation of the total amount, the application of the student discount, the enforcement of the prepayment percentage, and the validation of user inputs. These tests catch regressions early and serve as a living documentation of the rules.
+Unit tests were written for the most sensitive business rules of the backend: the computation of the total amount with the student discount and the promo code, the enforcement of the prepayment percentage, the validation of user inputs, and the state machine of the booking status. These tests catch regressions early and serve as a living documentation of the rules. The price pipeline test suite, in particular, includes the combination that revealed the bug found during the Sprint~3 review.
 
-\subsection{Integration Testing}
+\subsection{Integration Tests}
 
-Integration tests were performed through Postman collections that replay the main scenarios end to end: registration, login, trip creation, booking, payment, and rating. Each collection was executed after every significant change on the backend.
+Integration tests were performed through Postman collections that replay the main scenarios end to end: registration, login, trip creation, booking, payment, rating, and complaint. Each collection was executed after every significant change on the backend, and a short subset was kept in the repository as a smoke test that runs in less than a minute.
 
 \subsection{Manual Testing}
 
-Manual tests were conducted on the web application and on the mobile application, including cross-device testing on several Android phones. Feedback from members of the host organization also helped detect usability issues that automated tests cannot catch.
+Manual tests were conducted on the web application and on the mobile application, including cross-device testing on three Android phones with different screen sizes. Feedback from members of the host organization also helped detect usability issues that automated tests cannot catch, such as a confusing wording on the cancellation confirmation dialog that was rephrased the same week.
 
 \subsection{Summary of Tests}
 
 \begin{table}[H]
 \centering
 \caption{Summary of tested scenarios}
+\label{tab:tests_summary}
 \begin{tabular}{|l|c|}
 \hline
 \textbf{Scenario}                             & \textbf{Result} \\
@@ -209,7 +199,7 @@ Searching trips with filters and match score  & Passed \\
 \hline
 Booking with 50\% prepayment                  & Passed \\
 \hline
-Applying the student discount                 & Passed \\
+Applying the student discount and a promo code & Passed \\
 \hline
 Wallet top-up and history                     & Passed \\
 \hline
@@ -230,6 +220,10 @@ Multilingual switching (FR / EN / AR + RTL)   & Passed \\
 \end{tabular}
 \end{table}
 
+\section{Deployment}
+
+The web application is deployed on the development environment provided by ATOMIC IT through XAMPP, with the backend mounted under \texttt{/forsadrive} on the local Apache instance. The mobile application is built with \texttt{flutter build apk} and distributed manually as a release APK. Production deployment was not part of the internship perimeter, but the path is straightforward: replacing SQLite with PostgreSQL or MySQL, hosting the backend behind HTTPS on a VPS, integrating a real payment provider such as Konnect or Paymee in place of the simulated wallet, and publishing the mobile application on the Google Play Store. The class diagram and the API surface have been kept stable enough that this migration would not require a structural change.
+
 \section*{Conclusion}
 
-This chapter closed the realization phase of ForsaDrive by presenting the mobile application and the testing strategy applied to the entire platform. The Flutter client reuses the PHP backend designed in the previous chapters and adds the features that a phone makes possible: push notifications, interactive maps, real-time chat, and a multilingual interface with automatic RTL support. Together with the web application, it delivers the complete ride-sharing experience originally targeted by the project.
+This chapter closed the realization phase of ForsaDrive. Sprint~3 added the wallet and the intelligent layer that distinguishes a working prototype from a useful product: explicit financial information for the user, an explainable reliability score for drivers, an analytics dashboard, a promo code, and a compatibility score that helps the passenger pick a ride at a glance. Sprint~4 then completed the platform with the community features --- chat, ratings, complaints, social feed, HelpDesk --- and the multilingual interface, before the testing and deployment work brought the project to its current state. Together with the previous chapters, this discussion shows how a Tunisian carpooling platform can be built within the time of a final-year internship by following an agile process and by making technological choices that are deliberately aligned with both the local context and the available skills of the team.
