@@ -37,3 +37,7 @@ CLAUDE.md
 
 # ── Local duplicate working copy of the report (not for the repo) ─────────────
 PFE_PROJECT__1_/
+
+# ── Office app lock files ─────────────────────────────────────────────────────
+.~lock.*#
+~$*
