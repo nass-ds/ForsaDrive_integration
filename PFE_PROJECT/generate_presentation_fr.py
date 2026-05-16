@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-ForsaDrive — defense presentation generator (~20 slides, 16:9).
+ForsaDrive — générateur de la présentation de soutenance (version FR).
 
-Uses the same brand colors as the mobile app and references the same
-diagrams that ship with the LaTeX report.
+~20 diapositives, 16:9, mêmes couleurs que l'application mobile et
+mêmes diagrammes que le rapport LaTeX.
 
-Run:
-    python3 generate_presentation.py
+Lancer :
+    python3 generate_presentation_fr.py
 
-Output:
-    ForsaDrive_Defense.pptx (in the current directory)
+Sortie :
+    ForsaDrive_Defense_FR.pptx
 """
 
 import os
@@ -125,7 +125,7 @@ def add_header_bar(slide, title, eyebrow=None):
 def add_footer(slide, page_no, total, notes=None):
     add_rect(slide, 0, Inches(7.15), SLIDE_W, Inches(0.35), NAVY)
     add_text(slide, Inches(0.5), Inches(7.2), Inches(8), Inches(0.3),
-             "ForsaDrive  •  Final Year Project Defense  •  ATOMIC IT",
+             "ForsaDrive  •  Soutenance de fin d'études  •  ATOMIC IT",
              size=10, color=WHITE, anchor=MSO_ANCHOR.MIDDLE)
     add_text(slide, Inches(11.5), Inches(7.2), Inches(1.5), Inches(0.3),
              f"{page_no} / {total}",
@@ -231,29 +231,29 @@ def slide_title():
 
     # Eyebrow
     add_text(s, Inches(1.0), Inches(2.3), Inches(11), Inches(0.4),
-             "FINAL YEAR PROJECT  •  2025 — 2026", size=14, bold=True,
+             "PROJET DE FIN D'ÉTUDES  •  2025 — 2026", size=14, bold=True,
              color=ACCENT)
     # Big title
     add_text(s, Inches(1.0), Inches(2.7), Inches(11.5), Inches(1.2),
              "ForsaDrive", size=66, bold=True, color=WHITE)
     # Subtitle
     add_text(s, Inches(1.0), Inches(3.9), Inches(11.5), Inches(0.7),
-             "A Tunisian-context carpooling platform — Web, Mobile, and a unified backend",
+             "Plateforme de covoiturage adaptée au contexte tunisien — Web, Mobile et un backend unifié",
              size=20, color=CREAM)
 
     # Authors block
     add_rect(s, Inches(1.0), Inches(5.3), Inches(11.3), Inches(0.04), ACCENT)
     add_text(s, Inches(1.0), Inches(5.4), Inches(5.5), Inches(0.4),
-             "Presented by", size=11, color=ACCENT, bold=True)
+             "Présenté par", size=11, color=ACCENT, bold=True)
     add_text(s, Inches(1.0), Inches(5.65), Inches(5.5), Inches(0.5),
              "Youssef BEN ABID  &  Anas YOUNES", size=18, bold=True, color=WHITE)
 
     add_text(s, Inches(7.0), Inches(5.4), Inches(5.5), Inches(0.4),
-             "Supervised by", size=11, color=ACCENT, bold=True)
+             "Encadré par", size=11, color=ACCENT, bold=True)
     add_text(s, Inches(7.0), Inches(5.65), Inches(5.5), Inches(0.4),
-             "Mr. Khalil SELMI  (ATOMIC IT)", size=14, color=WHITE)
+             "M. Khalil SELMI  (ATOMIC IT — encadrant professionnel)", size=13, color=WHITE)
     add_text(s, Inches(7.0), Inches(5.95), Inches(5.5), Inches(0.4),
-             "Ms. Ines BEN NASR  (Academic)", size=14, color=WHITE)
+             "Mme Ines BEN NASR  (encadrante académique)", size=13, color=WHITE)
 
     # Footer
     add_rect(s, 0, Inches(7.15), SLIDE_W, Inches(0.35), NAVY_DARK)
@@ -265,16 +265,16 @@ def slide_title():
 def slide_plan():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Outline of the defense", eyebrow="Plan")
+    add_header_bar(s, "Plan de la soutenance", eyebrow="Plan")
 
     items = [
-        ("01", "Project context & problem", "Why mobility in Tunisia is a real problem"),
-        ("02", "Existing solutions", "What people use today and where it falls short"),
-        ("03", "Proposed solution & methodology", "ForsaDrive concept and the Scrum process"),
-        ("04", "Conception", "Architecture, use cases, class diagram"),
-        ("05", "Realization — sprint by sprint", "From foundations to community features"),
-        ("06", "Tests & demo", "What works and a live walk-through"),
-        ("07", "Conclusion & future work", "What we delivered and what comes next"),
+        ("01", "Cadre du projet & problématique", "Pourquoi la mobilité en Tunisie est un vrai problème"),
+        ("02", "Solutions existantes", "Ce qui est utilisé aujourd'hui et ses limites"),
+        ("03", "Solution proposée & méthodologie", "Le concept ForsaDrive et la démarche Scrum"),
+        ("04", "Conception", "Architecture, cas d'utilisation, diagramme de classes"),
+        ("05", "Réalisation — sprint par sprint", "Des fondations aux fonctionnalités communautaires"),
+        ("06", "Tests & démo", "Ce qui fonctionne et démonstration en direct"),
+        ("07", "Conclusion & perspectives", "Ce qui a été livré et la suite"),
     ]
     y = Inches(1.7)
     for num, title, sub in items:
@@ -293,22 +293,22 @@ def slide_plan():
 def slide_problem():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Mobility in Tunisia — a real, daily problem",
-                   eyebrow="Context & motivation")
+    add_header_bar(s, "Mobilité en Tunisie — un problème quotidien réel",
+                   eyebrow="Contexte & motivation")
 
     add_text(s, Inches(0.7), Inches(1.55), Inches(12), Inches(0.5),
-             "Public transport is irregular. Private cars travel half empty. "
-             "Existing apps are not built for the local market.",
+             "Le transport public est irrégulier. Les voitures privées roulent à moitié vides. "
+             "Les applications existantes ne sont pas pensées pour le marché local.",
              size=15, color=DARK_TEXT)
 
     # Three columns of pain points
     cols = [
-        ("Public transport",
-         "Overcrowded buses, irregular schedules, weak coverage of secondary cities."),
-        ("Informal carpooling",
-         "Facebook groups, no identity verification, no payment trace, no rating."),
-        ("International apps",
-         "BlaBlaCar/inDrive/Bolt — payment models and language not adapted to Tunisia."),
+        ("Transport public",
+         "Bus bondés, horaires irréguliers, faible couverture des villes secondaires."),
+        ("Covoiturage informel",
+         "Groupes Facebook, sans vérification d'identité, sans trace de paiement, sans notation."),
+        ("Applications internationales",
+         "BlaBlaCar/inDrive/Bolt — moyens de paiement et langue non adaptés à la Tunisie."),
     ]
     x = Inches(0.7)
     for title, body in cols:
@@ -324,11 +324,12 @@ def slide_problem():
     add_rect(s, Inches(0.7), Inches(5.3), Inches(12.0), Inches(1.4), NAVY)
     add_rect(s, Inches(0.7), Inches(5.3), Inches(0.1), Inches(1.4), ACCENT)
     add_text(s, Inches(1.0), Inches(5.45), Inches(11.5), Inches(0.4),
-             "PROBLEM STATEMENT", size=11, bold=True, color=ACCENT)
+             "PROBLÉMATIQUE", size=11, bold=True, color=ACCENT)
     add_text(s, Inches(1.0), Inches(5.75), Inches(11.5), Inches(0.9),
-             "Tunisia lacks a secure, affordable digital ride-sharing solution "
-             "adapted to local payment habits, available on web and mobile, "
-             "and capable of building genuine trust between drivers and passengers.",
+             "La Tunisie ne dispose pas d'une solution numérique de covoiturage "
+             "sécurisée, abordable, adaptée aux habitudes de paiement locales, "
+             "disponible sur le web et le mobile, et capable d'établir une vraie "
+             "confiance entre conducteurs et passagers.",
              size=14, color=WHITE)
 
     add_footer(s, 3, TOTAL)
@@ -336,31 +337,31 @@ def slide_problem():
 def slide_company():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "ATOMIC IT — host company", eyebrow="Internship framework")
+    add_header_bar(s, "ATOMIC IT — entreprise d'accueil", eyebrow="Cadre du stage")
 
     add_bullets(s, Inches(0.7), Inches(1.7), Inches(7.5), Inches(4.5),
         [
-            "IT engineering services: web and mobile development, software consulting.",
-            "Modern stack: Linux/Windows, .NET, Java, Android/iOS, PHP.",
-            "Located in Kelibia, Nabeul. Director: Mr. Khalil SELMI.",
-            "Flat structure — short feedback loops between developers and management.",
-            "Internship inside the engineering team, mentored by senior developers.",
-            "Agile Scrum applied: daily stand-ups, weekly reviews with the supervisor.",
+            "Services en ingénierie informatique : développement web/mobile, conseil logiciel.",
+            "Pile moderne : Linux/Windows, .NET, Java, Android/iOS, PHP.",
+            "Basée à Kélibia, Nabeul. Directeur : M. Khalil SELMI.",
+            "Structure plate — boucles de retour courtes entre développeurs et direction.",
+            "Stage au sein de l'équipe d'ingénierie, encadré par des développeurs seniors.",
+            "Scrum appliqué : stand-ups quotidiens, revues hebdomadaires avec l'encadrant.",
         ], size=15)
 
     # Right-side info card
     add_rect(s, Inches(8.7), Inches(1.7), Inches(4.0), Inches(4.5), LIGHT_GREY)
     add_rect(s, Inches(8.7), Inches(1.7), Inches(4.0), Inches(0.06), ACCENT)
     add_text(s, Inches(8.95), Inches(1.85), Inches(3.5), Inches(0.4),
-             "AT A GLANCE", size=11, bold=True, color=NAVY)
+             "EN BREF", size=11, bold=True, color=NAVY)
 
     info = [
-        ("Activity", "Web & mobile development"),
-        ("Director", "Mr. Khalil SELMI"),
-        ("Location", "Kelibia, Nabeul"),
-        ("Phone", "+216 55 343 224"),
+        ("Activité", "Développement web & mobile"),
+        ("Directeur", "M. Khalil SELMI"),
+        ("Lieu", "Kélibia, Nabeul"),
+        ("Téléphone", "+216 55 343 224"),
         ("Email", "contact@atomicitpro.com"),
-        ("Methodology", "Agile / Scrum"),
+        ("Méthodologie", "Agile / Scrum"),
     ]
     y = Inches(2.35)
     for k, v in info:
@@ -375,24 +376,24 @@ def slide_company():
 def slide_existing():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "What people use today", eyebrow="Critical study")
+    add_header_bar(s, "Ce qui est utilisé aujourd'hui", eyebrow="Étude critique")
 
-    headers = ["Criterion", "Facebook", "inDrive", "Bolt", "BlaBlaCar", "ForsaDrive"]
+    headers = ["Critère", "Facebook", "inDrive", "Bolt", "BlaBlaCar", "ForsaDrive"]
     rows = [
-        ["Identity verification",   "—",   "Partial", "✓", "✓", "✓"],
-        ["In-app payment",          "—",   "—",       "✓", "✓", "✓"],
-        ["Long-distance rides",     "✓",   "—",       "—", "✓", "✓"],
-        ["Rating system",           "—",   "✓",       "✓", "✓", "✓"],
-        ["Adapted to local context","✓",   "Partial", "Partial", "—", "✓"],
-        ["Student discount (50%)",  "—",   "—",       "—", "—", "✓"],
-        ["Wallet-based balance",    "—",   "—",       "—", "—", "✓"],
+        ["Vérification d'identité",        "—",   "Partielle", "✓", "✓", "✓"],
+        ["Paiement intégré",               "—",   "—",         "✓", "✓", "✓"],
+        ["Trajets longue distance",        "✓",   "—",         "—", "✓", "✓"],
+        ["Système de notation",            "—",   "✓",         "✓", "✓", "✓"],
+        ["Adapté au contexte local",       "✓",   "Partiel",   "Partiel", "—", "✓"],
+        ["Réduction étudiante (50%)",      "—",   "—",         "—", "—", "✓"],
+        ["Portefeuille interne",           "—",   "—",         "—", "—", "✓"],
     ]
     add_table(s, Inches(0.7), Inches(1.7), Inches(12), Inches(4.6),
               headers, rows, font_size=12, header_size=12)
 
     add_text(s, Inches(0.7), Inches(6.45), Inches(12), Inches(0.5),
-             "No existing option combines local fit with structured trust mechanisms. "
-             "ForsaDrive sits exactly in that gap.",
+             "Aucune solution existante ne combine l'adaptation locale et des mécanismes "
+             "de confiance structurés. ForsaDrive se positionne précisément dans ce vide.",
              size=13, bold=True, color=NAVY)
 
     add_footer(s, 5, TOTAL)
@@ -400,23 +401,23 @@ def slide_existing():
 def slide_solution():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "ForsaDrive — what we built", eyebrow="Proposed solution")
+    add_header_bar(s, "ForsaDrive — ce que nous avons construit", eyebrow="Solution proposée")
 
     add_text(s, Inches(0.7), Inches(1.55), Inches(12), Inches(0.6),
-        "An integrated ecosystem: web app, mobile app, and a shared backend, "
-        "covering the full lifecycle from registration to post-trip rating.",
+        "Un écosystème intégré : application web, application mobile et un backend partagé, "
+        "couvrant tout le cycle de vie, de l'inscription jusqu'à la notation post-trajet.",
         size=14, color=DARK_TEXT)
 
     pillars = [
-        ("Local fit",
-         "50% prepayment + cash settlement, French/English/Arabic with RTL, "
-         "Tunisian-recognized university domains."),
-        ("Trust",
-         "Identity & student verification, ratings on both sides, "
-         "complaint workflow, reliability score."),
-        ("Smart features",
-         "Compatibility score, driver analytics, ride boosting, "
-         "social feed, in-app chat, AI-assisted helpdesk."),
+        ("Adaptation locale",
+         "Acompte de 50 % + règlement en cash, français/anglais/arabe avec RTL, "
+         "domaines universitaires tunisiens reconnus."),
+        ("Confiance",
+         "Vérification d'identité et de statut étudiant, notation des deux côtés, "
+         "gestion des plaintes, score de fiabilité."),
+        ("Fonctions intelligentes",
+         "Score de compatibilité, tableau de bord conducteur, mise en avant des trajets, "
+         "fil social, messagerie intégrée, helpdesk assisté."),
     ]
     x = Inches(0.7)
     for title, body in pillars:
@@ -430,10 +431,10 @@ def slide_solution():
 
     # KPI row
     kpis = [
-        ("3", "coordinated apps"),
-        ("4", "functional sprints"),
-        ("20+", "domain entities"),
-        ("3", "supported languages"),
+        ("3", "applications coordonnées"),
+        ("4", "sprints fonctionnels"),
+        ("20+", "entités métier"),
+        ("3", "langues supportées"),
     ]
     x = Inches(0.7)
     for v, lbl in kpis:
@@ -451,21 +452,21 @@ def slide_solution():
 def slide_methodology():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Scrum — five iterations grouped into two releases",
-                   eyebrow="Methodology")
+    add_header_bar(s, "Scrum — cinq itérations en deux releases",
+                   eyebrow="Méthodologie")
 
     add_text(s, Inches(0.7), Inches(1.55), Inches(12), Inches(0.5),
-             "Sprint 0 prepared the ground. Four functional sprints then delivered "
-             "two coherent releases of the product.",
+             "Le Sprint 0 a préparé le terrain. Quatre sprints fonctionnels ont ensuite "
+             "livré deux releases cohérentes du produit.",
              size=14, color=DARK_TEXT)
 
     # Sprint timeline (5 boxes)
     sprints = [
         ("S0", "Architecture\n& Conception", NAVY, ACCENT),
-        ("S1", "Foundations\n(Auth + Profiles)", ACCENT, NAVY),
-        ("S2", "Rides\n& Bookings", ACCENT, NAVY),
-        ("S3", "Payments\n& Intelligence", ACCENT, NAVY),
-        ("S4", "Community\n& Finalization", ACCENT, NAVY),
+        ("S1", "Fondations\n(Auth + Profils)", ACCENT, NAVY),
+        ("S2", "Trajets\n& Réservations", ACCENT, NAVY),
+        ("S3", "Paiements\n& Intelligence", ACCENT, NAVY),
+        ("S4", "Communauté\n& Finalisation", ACCENT, NAVY),
     ]
     box_w = Inches(2.3)
     gap   = Inches(0.15)
@@ -485,20 +486,20 @@ def slide_methodology():
     # Release labels
     add_rect(s, Inches(3.0), Inches(4.85), Inches(4.6), Inches(0.04), ACCENT)
     add_text(s, Inches(3.0), Inches(4.95), Inches(4.6), Inches(0.4),
-             "RELEASE 1 — usable booking loop",
+             "RELEASE 1 — boucle de réservation utilisable",
              size=11, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
 
     add_rect(s, Inches(7.7), Inches(4.85), Inches(4.6), Inches(0.04), ACCENT)
     add_text(s, Inches(7.7), Inches(4.95), Inches(4.6), Inches(0.4),
-             "RELEASE 2 — intelligence + community",
+             "RELEASE 2 — intelligence + communauté",
              size=11, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
 
     # Process bullets
     add_bullets(s, Inches(0.7), Inches(5.6), Inches(12), Inches(1.4),
         [
-            "Daily stand-ups inside the team — weekly reviews with the supervising engineer.",
-            "Each sprint produced a usable increment, reviewed and demonstrated.",
-            "Trello board kept the backlog visible — story points on a Fibonacci scale.",
+            "Stand-ups quotidiens au sein de l'équipe — revues hebdomadaires avec l'encadrant.",
+            "Chaque sprint a produit un incrément utilisable, revu et démontré.",
+            "Tableau Trello pour garder le backlog visible — story points sur une échelle Fibonacci.",
         ], size=13)
 
     add_footer(s, 7, TOTAL)
@@ -506,34 +507,34 @@ def slide_methodology():
 def slide_architecture():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Architecture — client / server, three tiers",
+    add_header_bar(s, "Architecture — client / serveur, trois couches",
                    eyebrow="Sprint 0 · Conception")
 
     # Left column — bullets
     add_bullets(s, Inches(0.7), Inches(1.7), Inches(5.4), Inches(5.0),
         [
-            "Two clients (web + mobile) consume one REST API.",
-            "Backend in PHP, exposed under /api/, secured with bearer tokens.",
-            "Three tiers: presentation, application, data.",
-            "External services (payment, notifications, file storage) only "
-            "reached through the backend — no client secrets.",
-            "HTTPS in production. Passwords with bcrypt. Audit log on sensitive "
-            "operations.",
+            "Deux clients (web + mobile) consomment une seule API REST.",
+            "Backend en PHP, exposé sous /api/, sécurisé par bearer tokens.",
+            "Trois couches : présentation, application, données.",
+            "Services externes (paiement, notifications, stockage) joignables "
+            "uniquement via le backend — aucun secret côté client.",
+            "HTTPS en production. Mots de passe bcrypt. Journal d'audit sur les "
+            "opérations sensibles.",
         ], size=14)
 
     # Right side — schematic boxes
     box_x = Inches(7.0); box_y = Inches(1.85)
     add_rect(s, box_x,             box_y,             Inches(2.6), Inches(0.9), CREAM)
-    add_text(s, box_x, box_y, Inches(2.6), Inches(0.9), "Web App",
+    add_text(s, box_x, box_y, Inches(2.6), Inches(0.9), "Application Web",
              size=14, bold=True, color=NAVY, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
 
     add_rect(s, box_x + Inches(3.0), box_y,             Inches(2.6), Inches(0.9), CREAM)
-    add_text(s, box_x + Inches(3.0), box_y, Inches(2.6), Inches(0.9), "Mobile App",
-             size=14, bold=True, color=NAVY, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    add_text(s, box_x + Inches(3.0), box_y, Inches(2.6), Inches(0.9), "Application Mobile",
+             size=13, bold=True, color=NAVY, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
 
     add_rect(s, box_x + Inches(1.5), box_y + Inches(1.4), Inches(2.6), Inches(0.95), NAVY)
     add_text(s, box_x + Inches(1.5), box_y + Inches(1.4), Inches(2.6), Inches(0.95),
-             "Backend\n(REST API)",
+             "Backend\n(API REST)",
              size=14, bold=True, color=WHITE, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
 
     add_rect(s, box_x + Inches(1.5), box_y + Inches(2.85), Inches(2.6), Inches(0.85), ACCENT)
@@ -557,7 +558,7 @@ def slide_architecture():
 def slide_class_diagram():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Class diagram — 20+ entities, 5 logical groups",
+    add_header_bar(s, "Diagramme de classes — 20+ entités, 5 groupes",
                    eyebrow="Sprint 0 · Conception")
 
     add_image_centered(s, img("forsadrive_class_diagram.png"),
@@ -565,8 +566,8 @@ def slide_class_diagram():
 
     # Caption / groups (above the footer band at 7.15)
     add_text(s, Inches(0.7), Inches(6.55), Inches(12), Inches(0.4),
-             "Users & Profiles  ·  Trips & Bookings  ·  Payments & Ratings  "
-             "·  Verification & Discounts  ·  Communication & Moderation",
+             "Utilisateurs & profils  ·  Trajets & réservations  ·  Paiements & notations  "
+             "·  Vérification & réductions  ·  Communication & modération",
              size=12, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
 
     add_footer(s, 9, TOTAL)
@@ -574,11 +575,11 @@ def slide_class_diagram():
 def slide_use_case():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Global use case — four actors", eyebrow="Sprint 0 · Conception")
+    add_header_bar(s, "Cas d'utilisation global — quatre acteurs", eyebrow="Sprint 0 · Conception")
     add_image_centered(s, img("ForsaDrive_UseCase.png"),
                        Inches(1.4), Inches(11.5), Inches(4.95))
     add_text(s, Inches(0.7), Inches(6.55), Inches(12), Inches(0.4),
-             "Passenger  ·  Driver  ·  Administrator  ·  System (automated)",
+             "Passager  ·  Conducteur  ·  Administrateur  ·  Système (automatique)",
              size=12, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
     add_footer(s, 10, TOTAL)
 
@@ -592,23 +593,24 @@ def slide_sprint_section(num, color_dark, color_accent, title, mission,
     add_rect(s, 0, 0, Inches(3.4), SLIDE_H, color_dark)
     add_text(s, Inches(0.4), Inches(0.6), Inches(2.6), Inches(0.5),
              f"SPRINT {num}", size=14, bold=True, color=color_accent)
+    # MISSION label is rendered below from the sprint definition
     add_text(s, Inches(0.4), Inches(1.0), Inches(2.6), Inches(2.0),
              title, size=28, bold=True, color=WHITE)
     add_text(s, Inches(0.4), Inches(3.4), Inches(2.6), Inches(0.4),
-             "MISSION", size=11, bold=True, color=color_accent)
+             "OBJECTIF", size=11, bold=True, color=color_accent)
     add_text(s, Inches(0.4), Inches(3.7), Inches(2.7), Inches(2.0),
              mission, size=12, color=WHITE)
 
     # Right area — backlog table
     add_text(s, Inches(3.7), Inches(0.4), Inches(9), Inches(0.5),
-             "Sprint backlog (extract)", size=14, bold=True, color=NAVY)
+             "Backlog du sprint (extrait)", size=14, bold=True, color=NAVY)
     headers = ["#", "User story", "Pts"]
     add_table(s, Inches(3.7), Inches(0.85), Inches(9.3), Inches(3.3),
               headers, backlog_rows, font_size=11, header_size=11)
 
     # Deliverables row
     add_text(s, Inches(3.7), Inches(4.35), Inches(9), Inches(0.4),
-             "Deliverables", size=14, bold=True, color=NAVY)
+             "Livrables", size=14, bold=True, color=NAVY)
     add_bullets(s, Inches(3.7), Inches(4.75), Inches(9.3), Inches(2.3),
                 deliverables, size=12)
 
@@ -617,105 +619,105 @@ def slide_sprint_section(num, color_dark, color_accent, title, mission,
 def slide_sprint1():
     slide_sprint_section(
         1, NAVY, ACCENT,
-        "Foundations",
-        "Account creation, authentication, profile, "
-        "student verification, driver application & admin approval.",
+        "Fondations",
+        "Création de compte, authentification, profil, vérification "
+        "étudiante, candidature conducteur et validation par l'admin.",
         [
-            ["US1.1", "Register an account",                        "5"],
-            ["US1.2", "Login with email + password",                "3"],
-            ["US1.3", "View / update profile",                      "3"],
-            ["US1.4", "Student verification via university email OTP","8"],
-            ["US1.5", "Apply to become a driver (license + vehicle)", "8"],
-            ["US1.6", "Admin reviews driver applications",          "5"],
-            ["US1.7", "Admin manages recognized university domains","3"],
+            ["US1.1", "Créer un compte",                            "5"],
+            ["US1.2", "Se connecter avec email + mot de passe",     "3"],
+            ["US1.3", "Voir / modifier le profil",                  "3"],
+            ["US1.4", "Vérification étudiante par OTP universitaire","8"],
+            ["US1.5", "Postuler comme conducteur (permis + véhicule)","8"],
+            ["US1.6", "L'admin examine les candidatures conducteur","5"],
+            ["US1.7", "L'admin gère les domaines universitaires",   "3"],
         ],
         [
-            "Self-service OTP flow (10-min code, 5-attempt cap, 30s cooldown).",
-            "Driver application creates DriverProfile + Vehicle on approval.",
-            "Audit log entry on every verification event.",
+            "Flux OTP en libre-service (code 10 min, 5 tentatives max, 30 s entre envois).",
+            "À l'approbation, création automatique de DriverProfile + Véhicule.",
+            "Entrée dans le journal d'audit à chaque vérification.",
         ],
         11)
 
 def slide_sprint2():
     slide_sprint_section(
         2, NAVY, ACCENT,
-        "Rides & Bookings",
-        "Driver publishes a ride. Passenger searches, filters, books with "
-        "50% prepayment.",
+        "Trajets & Réservations",
+        "Un conducteur publie un trajet. Un passager cherche, filtre, "
+        "réserve avec un acompte de 50 %.",
         [
-            ["US2.1", "Publish a ride (origin, destination, date, price, seats)", "5"],
-            ["US2.2", "Modify or cancel a ride",                                  "3"],
-            ["US2.3", "Search rides by origin / destination / date",              "5"],
-            ["US2.4", "Filter by price, departure time, driver rating",           "5"],
-            ["US2.5", "View ride detail and driver profile",                      "3"],
-            ["US2.6", "Book seats with 50% prepayment",                           "8"],
-            ["US2.7", "Group booking for friends",                                "5"],
-            ["US2.8", "Driver accepts / rejects booking requests",                "5"],
+            ["US2.1", "Publier un trajet (origine, destination, date, prix, places)", "5"],
+            ["US2.2", "Modifier ou annuler un trajet",                                "3"],
+            ["US2.3", "Rechercher des trajets par origine / destination / date",      "5"],
+            ["US2.4", "Filtrer par prix, heure de départ, note du conducteur",        "5"],
+            ["US2.5", "Voir le détail du trajet et le profil du conducteur",          "3"],
+            ["US2.6", "Réserver des places avec acompte de 50 %",                     "8"],
+            ["US2.7", "Réservation de groupe pour des amis",                          "5"],
+            ["US2.8", "Le conducteur accepte / refuse les demandes",                  "5"],
         ],
         [
-            "Booking persisted only if prepayment succeeds — no orphan bookings.",
-            "Search response indexed on origin, destination, departure_date.",
-            "Activity diagram covered cash collection at end of trip.",
+            "La réservation n'est créée qu'après succès de l'acompte — pas de réservation orpheline.",
+            "Index sur from_location, to_location et departure_time pour la recherche.",
+            "Le diagramme d'activité couvre la collecte cash en fin de trajet.",
         ],
         12)
 
 def slide_sprint3():
     slide_sprint_section(
         3, NAVY, ACCENT,
-        "Payments & Intelligence",
-        "Wallet, promo codes, ride boosting, driver analytics, "
-        "compatibility score.",
+        "Paiements & Intelligence",
+        "Portefeuille, codes promo, mise en avant de trajets, "
+        "tableau de bord conducteur, score de compatibilité.",
         [
-            ["US3.1", "View wallet balance and history",                  "5"],
-            ["US3.2", "Top up wallet",                                    "3"],
-            ["US3.3", "Auto-apply 50% student discount on booking",       "3"],
-            ["US3.4", "Apply organizational promo code",                  "3"],
-            ["US3.5", "Boost a ride to top of search/feed",               "5"],
-            ["US3.6", "Driver dashboard with reliability + revenue + ratings","8"],
-            ["US3.7", "Compatibility score badge per ride",               "5"],
-            ["US3.8", "Recompute reliability after every completed trip", "3"],
+            ["US3.1", "Voir solde et historique du portefeuille",          "5"],
+            ["US3.2", "Recharger le portefeuille",                          "3"],
+            ["US3.3", "Appliquer auto. la réduction étudiante (50 %)",     "3"],
+            ["US3.4", "Appliquer un code promo organisationnel",            "3"],
+            ["US3.5", "Mettre un trajet en avant (boost)",                  "5"],
+            ["US3.6", "Tableau de bord : fiabilité + revenus + notes",     "8"],
+            ["US3.7", "Badge de score de compatibilité par trajet",        "5"],
+            ["US3.8", "Recalculer la fiabilité après chaque trajet terminé","3"],
         ],
         [
-            "Price pipeline: base × seats → student 50% → promo % → 50% prepayment.",
-            "Reliability score: rating × completion × (1 − cancellation).",
-            "Bug caught at sprint review: promo applied before student discount — fixed.",
+            "Pipeline prix : base × places → étudiant 50 % → promo % → acompte 50 %.",
+            "Score de fiabilité : note × taux de complétion × (1 − taux d'annulation).",
+            "Bug détecté en revue : la promo s'appliquait avant la réduction étudiante — corrigé.",
         ],
         13)
 
 def slide_sprint4():
     slide_sprint_section(
         4, NAVY, ACCENT,
-        "Community & Finalization",
-        "Chat, ratings, complaints, social feed, helpdesk, "
-        "multilingual interface, admin panel.",
+        "Communauté & Finalisation",
+        "Messagerie, notations, plaintes, fil social, helpdesk, "
+        "interface multilingue, panneau d'administration.",
         [
-            ["US4.1", "Real-time in-app chat (poll-based)",          "5"],
-            ["US4.2", "Push notifications (FCM)",                    "3"],
-            ["US4.3", "Social feed (posts, likes, comments)",        "8"],
-            ["US4.4", "Rate the other party after a trip",           "3"],
-            ["US4.5", "File a complaint after a trip",               "5"],
-            ["US4.6", "AI-assisted HelpDesk with bot escalation",    "5"],
-            ["US4.7", "Switch interface FR / EN / AR (RTL)",         "5"],
-            ["US4.8", "Admin panel — 7 tabs",                        "8"],
+            ["US4.1", "Messagerie en temps réel (polling)",          "5"],
+            ["US4.2", "Notifications push (FCM)",                     "3"],
+            ["US4.3", "Fil social (posts, likes, commentaires)",      "8"],
+            ["US4.4", "Noter l'autre partie après un trajet",         "3"],
+            ["US4.5", "Déposer une plainte après un trajet",          "5"],
+            ["US4.6", "HelpDesk assisté avec escalade vers humain",   "5"],
+            ["US4.7", "Changer la langue FR / EN / AR (RTL)",         "5"],
+            ["US4.8", "Panneau admin — 7 onglets",                    "8"],
         ],
         [
-            "Chat polled every 3 s — sufficient for current scale, no WebSocket dep.",
-            "HelpDesk bot covers 14 FAQ categories, escalates to human agent.",
-            "Arabic flips the layout automatically through Flutter localizations.",
+            "Polling toutes les 3 s — suffisant à notre échelle, sans dépendance WebSocket.",
+            "Bot HelpDesk : 14 catégories FAQ, escalade vers un agent humain si besoin.",
+            "L'arabe bascule automatiquement la mise en page via les localizations Flutter.",
         ],
         14)
 
 def slide_screens():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Selected screens", eyebrow="Realization")
+    add_header_bar(s, "Quelques écrans", eyebrow="Réalisation")
 
     # 4-column grid of mobile screens
     captions = [
-        ("Authentication", "mobile_auth.png"),
-        ("Search + match score", "mobile_search.png"),
-        ("Trip details + map", "mobile_trip_details.png"),
-        ("Driver dashboard", "mobile_driver_dashboard.png"),
+        ("Authentification", "mobile_auth.png"),
+        ("Recherche + score", "mobile_search.png"),
+        ("Détail trajet + carte", "mobile_trip_details.png"),
+        ("Tableau de bord conducteur", "mobile_driver_dashboard.png"),
     ]
     x = Inches(0.5); y = Inches(1.6)
     cell_w = Inches(3.0)
@@ -729,8 +731,8 @@ def slide_screens():
         x += cell_w + Inches(0.13)
 
     add_text(s, Inches(0.5), Inches(6.3), Inches(12.3), Inches(0.4),
-             "Web counterparts cover the same workflows for desktop users "
-             "and the administration panel.",
+             "Les équivalents web couvrent les mêmes parcours pour les utilisateurs "
+             "desktop et le panneau d'administration.",
              size=12, color=MUTED, align=PP_ALIGN.CENTER)
 
     add_footer(s, 15, TOTAL)
@@ -752,22 +754,22 @@ def add_image_centered_into(slide, path, x, y, w, h):
 def slide_mobile_features():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "What only the mobile makes possible",
-                   eyebrow="Mobile-specific features")
+    add_header_bar(s, "Ce que seul le mobile permet",
+                   eyebrow="Fonctionnalités mobiles")
 
     cells = [
-        ("Push notifications",
-         "Firebase Cloud Messaging delivers booking, message, and ride alerts "
-         "even when the app is in the background."),
-        ("Interactive map",
-         "OpenStreetMap tiles + OSRM routing draw the driving line between "
-         "origin and destination on each ride detail screen."),
-        ("Real-time chat",
-         "Conversations linked to bookings — bubble UI, date dividers, read receipts. "
-         "3-second polling, no WebSocket dependency."),
-        ("Multilingual + RTL",
-         "FR / EN / AR with automatic right-to-left layout flipping for Arabic, "
-         "no manual override in any widget."),
+        ("Notifications push",
+         "Firebase Cloud Messaging livre les alertes de réservation, message et trajet "
+         "même quand l'app est en arrière-plan."),
+        ("Carte interactive",
+         "Tuiles OpenStreetMap + routage OSRM pour tracer le trajet entre "
+         "origine et destination sur chaque écran de détail."),
+        ("Messagerie temps réel",
+         "Conversations liées aux réservations — bulles, séparateurs par date, accusés de lecture. "
+         "Polling 3 s, sans dépendance WebSocket."),
+        ("Multilingue + RTL",
+         "FR / EN / AR avec bascule automatique en RTL pour l'arabe, "
+         "sans aucun override manuel dans les widgets."),
     ]
     x = Inches(0.6); y = Inches(1.6)
     w = Inches(6.0); h = Inches(2.55)
@@ -787,24 +789,24 @@ def slide_mobile_features():
 def slide_stack():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Technology stack", eyebrow="Realization")
+    add_header_bar(s, "Pile technologique", eyebrow="Réalisation")
 
     # Three columns — frontend / backend / mobile
     blocks = [
-        ("Web frontend", NAVY, [
-            ("PHP 8 (server-rendered)", "Routing, sessions, page rendering."),
-            ("HTML5 + Bootstrap 5", "Responsive layout, consistent components."),
-            ("Vanilla JavaScript", "Form validation, AJAX, admin tab switching."),
+        ("Frontend web", NAVY, [
+            ("PHP 8 (rendu serveur)", "Routage, sessions, rendu des pages."),
+            ("HTML5 + Bootstrap 5", "Mise en page responsive, composants cohérents."),
+            ("JavaScript vanille", "Validation formulaires, AJAX, onglets admin."),
         ]),
-        ("Backend / data", ACCENT_DARK, [
-            ("PHP REST API", "Front-controller under /api/, JSON responses."),
-            ("PDO + bearer tokens", "Parameterized queries, 32-byte hex tokens."),
-            ("SQLite (WAL mode)", "Shared file between web and mobile."),
+        ("Backend / données", ACCENT_DARK, [
+            ("API REST PHP", "Front-controller sous /api/, réponses JSON."),
+            ("PDO + bearer tokens", "Requêtes paramétrées, tokens hex 32 octets."),
+            ("SQLite (mode WAL)", "Fichier partagé entre web et mobile."),
         ]),
         ("Mobile", NAVY, [
-            ("Flutter (Dart)", "Single codebase, native rendering on Android & iOS."),
-            ("Provider + go_router", "State management + declarative navigation."),
-            ("FCM, flutter_map, l10n", "Push, OSM map, FR/EN/AR with RTL."),
+            ("Flutter (Dart)", "Un seul code, rendu natif sur Android et iOS."),
+            ("Provider + go_router", "Gestion d'état + navigation déclarative."),
+            ("FCM, flutter_map, l10n", "Push, carte OSM, FR/EN/AR avec RTL."),
         ]),
     ]
 
@@ -832,37 +834,37 @@ def slide_stack():
 def slide_tests():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Testing — continuous, not deferred",
-                   eyebrow="Quality")
+    add_header_bar(s, "Tests — en continu, pas reportés",
+                   eyebrow="Qualité")
 
     # Left: testing strategy
     add_text(s, Inches(0.7), Inches(1.7), Inches(5.5), Inches(0.4),
-             "Strategy", size=16, bold=True, color=NAVY)
+             "Stratégie", size=16, bold=True, color=NAVY)
     add_bullets(s, Inches(0.7), Inches(2.1), Inches(5.6), Inches(4.0),
         [
-            "Unit tests on the price pipeline, prepayment, booking state machine.",
-            "Postman collections replay end-to-end scenarios after each backend change.",
-            "Manual cross-device tests on three Android phones.",
-            "Weekly demo with the supervising engineer caught usability issues.",
+            "Tests unitaires sur le pipeline de prix, l'acompte, la machine à états des réservations.",
+            "Collections Postman rejouant les scénarios bout-en-bout après chaque changement.",
+            "Tests manuels multi-appareils sur trois téléphones Android.",
+            "Démo hebdomadaire avec l'encadrant pour repérer les soucis d'utilisabilité.",
         ], size=12)
 
     # Right: results table
     add_text(s, Inches(6.5), Inches(1.7), Inches(6.3), Inches(0.4),
-             "Results", size=16, bold=True, color=NAVY)
+             "Résultats", size=16, bold=True, color=NAVY)
     rows = [
-        ["Registration + student OTP",        "✓ Passed"],
-        ["Token-based session",                "✓ Passed"],
-        ["Driver application + approval",      "✓ Passed"],
-        ["Publish / cancel a ride",            "✓ Passed"],
-        ["Book with 50% prepayment",           "✓ Passed"],
-        ["Student discount + promo code",      "✓ Passed"],
-        ["Wallet top-up + history",            "✓ Passed"],
-        ["Ratings + complaints",               "✓ Passed"],
-        ["Real-time chat + push (FCM)",        "✓ Passed"],
-        ["Multilingual + RTL",                 "✓ Passed"],
+        ["Inscription + OTP étudiant",         "✓ Réussi"],
+        ["Session par bearer token",            "✓ Réussi"],
+        ["Candidature conducteur + approbation","✓ Réussi"],
+        ["Publication / annulation d'un trajet","✓ Réussi"],
+        ["Réservation avec acompte 50 %",       "✓ Réussi"],
+        ["Réduction étudiante + code promo",    "✓ Réussi"],
+        ["Recharge + historique portefeuille",  "✓ Réussi"],
+        ["Notations + plaintes",                "✓ Réussi"],
+        ["Chat temps réel + push (FCM)",        "✓ Réussi"],
+        ["Multilingue + RTL",                   "✓ Réussi"],
     ]
     add_table(s, Inches(6.5), Inches(2.1), Inches(6.3), Inches(4.7),
-              ["Scenario", "Result"], rows, font_size=11, header_size=11)
+              ["Scénario", "Résultat"], rows, font_size=11, header_size=11)
 
     add_footer(s, 18, TOTAL)
 
@@ -871,45 +873,45 @@ def slide_demo():
     page_bg(s, NAVY)
     add_rect(s, 0, Inches(3.4), Inches(0.4), Inches(0.8), ACCENT)
     add_text(s, Inches(1.0), Inches(2.5), Inches(11.5), Inches(0.5),
-             "LIVE DEMO", size=18, bold=True, color=ACCENT)
+             "DÉMONSTRATION", size=18, bold=True, color=ACCENT)
     add_text(s, Inches(1.0), Inches(3.0), Inches(11.5), Inches(1.5),
-             "ForsaDrive in action", size=64, bold=True, color=WHITE)
+             "ForsaDrive en action", size=64, bold=True, color=WHITE)
     add_text(s, Inches(1.0), Inches(4.7), Inches(11.5), Inches(0.7),
-             "Walk-through: registration → student verification → search → "
-             "book → driver acceptance → cash collection.",
+             "Parcours : inscription → vérification étudiante → recherche → "
+             "réservation → acceptation conducteur → collecte cash.",
              size=18, color=CREAM)
     add_footer(s, 19, TOTAL)
 
 def slide_limitations():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Limitations & roadmap", eyebrow="Honest assessment")
+    add_header_bar(s, "Limites & feuille de route", eyebrow="Évaluation honnête")
 
     # Two columns
     add_rect(s, Inches(0.6), Inches(1.6), Inches(6.0), Inches(5.0), LIGHT_GREY)
     add_rect(s, Inches(0.6), Inches(1.6), Inches(6.0), Inches(0.06), ACCENT)
     add_text(s, Inches(0.85), Inches(1.75), Inches(5.5), Inches(0.5),
-             "What's missing today", size=16, bold=True, color=NAVY)
+             "Ce qui manque aujourd'hui", size=16, bold=True, color=NAVY)
     add_bullets(s, Inches(0.85), Inches(2.3), Inches(5.6), Inches(4.5),
         [
-            "Wallet uses manual top-ups — no real payment gateway integrated yet.",
-            "SQLite is suited for development, not high-traffic production.",
-            "Mobile tested only on Android — iOS build not verified.",
-            "No forgot-password email flow yet.",
-            "Performance under concurrent load was not measured.",
+            "Le portefeuille fonctionne par rechargement manuel — pas encore de vraie passerelle de paiement.",
+            "SQLite convient au développement, pas à une production à fort trafic.",
+            "Mobile testé uniquement sur Android — build iOS non vérifié.",
+            "Pas encore de flux de mot de passe oublié par email.",
+            "Les performances sous charge concurrente n'ont pas été mesurées.",
         ], size=12, bullet_color=RGBColor(0xC0, 0x39, 0x2B))
 
     add_rect(s, Inches(6.7), Inches(1.6), Inches(6.0), Inches(5.0), CREAM)
     add_rect(s, Inches(6.7), Inches(1.6), Inches(6.0), Inches(0.06), NAVY)
     add_text(s, Inches(6.95), Inches(1.75), Inches(5.5), Inches(0.5),
-             "Next steps", size=16, bold=True, color=NAVY)
+             "Étapes suivantes", size=16, bold=True, color=NAVY)
     add_bullets(s, Inches(6.95), Inches(2.3), Inches(5.6), Inches(4.5),
         [
-            "Migrate to PostgreSQL or MySQL for production.",
-            "Integrate a Tunisian payment gateway (Konnect or Paymee).",
-            "Deploy backend behind HTTPS on a VPS, automated backups.",
-            "Publish the Flutter app on the Google Play Store.",
-            "Add 2FA for driver and admin accounts + offline cache on mobile.",
+            "Migrer vers PostgreSQL ou MySQL pour la production.",
+            "Intégrer une passerelle de paiement tunisienne (Konnect ou Paymee).",
+            "Déployer le backend en HTTPS sur un VPS, sauvegardes automatisées.",
+            "Publier l'application Flutter sur le Google Play Store.",
+            "Ajouter 2FA pour conducteurs/admins + cache hors-ligne sur mobile.",
         ], size=12)
 
     add_footer(s, 20, TOTAL)
@@ -921,10 +923,10 @@ def slide_thanks():
     add_text(s, Inches(1.0), Inches(2.6), Inches(11.5), Inches(0.5),
              "QUESTIONS & DISCUSSION", size=14, bold=True, color=ACCENT)
     add_text(s, Inches(1.0), Inches(3.1), Inches(11.5), Inches(1.5),
-             "Thank you for your attention.",
-             size=56, bold=True, color=WHITE)
+             "Merci pour votre attention.",
+             size=58, bold=True, color=WHITE)
     add_text(s, Inches(1.0), Inches(4.7), Inches(11.5), Inches(0.6),
-             "We are now ready for your questions.",
+             "Nous sommes prêts à répondre à vos questions.",
              size=20, color=CREAM)
 
     # Bottom names band
@@ -969,80 +971,80 @@ def slide_backup_divider():
     page_bg(s, NAVY)
     add_rect(s, 0, Inches(3.0), Inches(0.35), Inches(1.5), ACCENT)
     add_text(s, Inches(1.0), Inches(2.6), Inches(11), Inches(0.4),
-             "BACKUP MATERIAL", size=14, bold=True, color=ACCENT)
+             "DIAPOSITIVES DE SECOURS", size=14, bold=True, color=ACCENT)
     add_text(s, Inches(1.0), Inches(3.1), Inches(11.5), Inches(1.2),
-             "Annexes — for questions",
-             size=48, bold=True, color=WHITE)
+             "Annexes — pour les questions",
+             size=44, bold=True, color=WHITE)
     add_text(s, Inches(1.0), Inches(4.7), Inches(11.5), Inches(0.5),
-             "The following slides are not part of the main presentation. "
-             "They are kept available in case the jury asks for deeper detail.",
+             "Les diapositives suivantes ne font pas partie de la présentation principale. "
+             "Elles sont là au cas où le jury demanderait plus de détails.",
              size=14, color=CREAM)
 
 def slide_backup_seq_book():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Sequence — passenger books a ride", eyebrow="Backup A · Booking flow")
+    add_header_bar(s, "Séquence — réservation par un passager", eyebrow="Annexe A · Flux de réservation")
     add_image_centered(s, img("ForsaDrive_Sequence_BookRide.png"),
                        Inches(1.4), Inches(11.5), Inches(5.4))
     add_text(s, Inches(0.7), Inches(6.95), Inches(12), Inches(0.4),
-             "Prepayment is deducted from the wallet BEFORE the booking is persisted "
-             "— guarantees no orphan bookings.",
+             "L'acompte est débité du portefeuille AVANT que la réservation ne soit créée "
+             "— garantit qu'il n'y a pas de réservation orpheline.",
              size=11, color=MUTED, align=PP_ALIGN.CENTER)
     add_footer(s, "A", TOTAL)
 
 def slide_backup_seq_otp():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Sequence — student OTP verification", eyebrow="Backup B · Trust flow")
+    add_header_bar(s, "Séquence — vérification étudiante par OTP", eyebrow="Annexe B · Confiance")
     add_image_centered(s, img("ForsaDrive_Sequence_VerifyStudent.png"),
                        Inches(1.4), Inches(11.5), Inches(5.4))
     add_text(s, Inches(0.7), Inches(6.95), Inches(12), Inches(0.4),
-             "Domain checked against student_domains • 6-digit OTP, 10-min expiry, "
-             "5-attempt cap, 30s cooldown between sends.",
+             "Domaine vérifié dans student_domains • OTP à 6 chiffres, 10 min d'expiration, "
+             "5 tentatives max, 30 s entre deux envois.",
              size=11, color=MUTED, align=PP_ALIGN.CENTER)
     add_footer(s, "B", TOTAL)
 
 def slide_backup_seq_driver():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Sequence — driver application & admin approval",
-                   eyebrow="Backup C · Onboarding")
+    add_header_bar(s, "Séquence — candidature conducteur & approbation admin",
+                   eyebrow="Annexe C · Onboarding")
     add_image_centered(s, img("ForsaDrive_Sequence_DriverApplication.png"),
                        Inches(1.4), Inches(11.5), Inches(5.4))
     add_text(s, Inches(0.7), Inches(6.95), Inches(12), Inches(0.4),
-             "On approval: DriverProfile + Vehicle are created and the user role "
-             "is switched to DRIVER atomically.",
+             "À l'approbation : DriverProfile + Véhicule sont créés et le rôle utilisateur "
+             "passe à DRIVER de manière atomique.",
              size=11, color=MUTED, align=PP_ALIGN.CENTER)
     add_footer(s, "C", TOTAL)
 
 def slide_backup_activity():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Activity diagram — end-to-end booking journey",
-                   eyebrow="Backup D · Full lifecycle")
+    add_header_bar(s, "Diagramme d'activité — parcours complet de réservation",
+                   eyebrow="Annexe D · Cycle complet")
     add_image_centered(s, img("ForsaDrive_Activity_BookingFlow.png"),
                        Inches(1.4), Inches(11.5), Inches(5.4))
     add_text(s, Inches(0.7), Inches(6.95), Inches(12), Inches(0.4),
-             "Three swimlanes: passenger / system / driver. Decision points: "
-             "retry payment, accept/refuse, depart, arrive, cash collection.",
+             "Trois couloirs : passager / système / conducteur. Décisions : réessayer "
+             "le paiement, accepter/refuser, départ, arrivée, collecte cash.",
              size=11, color=MUTED, align=PP_ALIGN.CENTER)
     add_footer(s, "D", TOTAL)
 
 def slide_backup_price_pipeline():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Price computation pipeline", eyebrow="Backup E · Business rule")
+    add_header_bar(s, "Pipeline de calcul du prix", eyebrow="Annexe E · Règle métier")
 
     add_text(s, Inches(0.7), Inches(1.6), Inches(12), Inches(0.5),
-             "Order matters. Reviewed and validated with the supervising engineer.",
+             "L'ordre compte. Revu et validé avec l'encadrant.",
              size=14, color=DARK_TEXT)
 
     steps = [
-        ("1", "base price",     "price_per_seat × seats_booked"),
-        ("2", "student discount","if is_student_verified: price × 0.5"),
-        ("3", "promo code",     "if org code valid: price × (1 − pct/100)"),
-        ("4", "prepayment",     "prepayment = price × 0.5"),
-        ("5", "persist",        "store all 5 values on the booking row"),
+        ("1", "prix de base",       "price_per_seat × seats_booked"),
+        ("2", "réduction étudiante","si is_student_verified : price × 0.5"),
+        ("3", "code promo",         "si code org valide : price × (1 − pct/100)"),
+        ("4", "acompte",            "prepayment = price × 0.5"),
+        ("5", "persister",          "stocker les 5 valeurs sur la ligne booking"),
     ]
     y = Inches(2.4)
     for num, label, formula in steps:
@@ -1058,15 +1060,15 @@ def slide_backup_price_pipeline():
 
     add_rect(s, Inches(0.7), Inches(6.3), Inches(12), Inches(0.5), CREAM)
     add_text(s, Inches(0.85), Inches(6.35), Inches(11.8), Inches(0.4),
-             "Bug caught at Sprint 3 review: steps 2 & 3 were inverted. "
-             "Fixed same evening, locked by a unit test.",
+             "Bug détecté en revue de Sprint 3 : étapes 2 et 3 inversées. "
+             "Corrigé le soir même, verrouillé par un test unitaire.",
              size=12, bold=True, color=NAVY, anchor=MSO_ANCHOR.MIDDLE)
     add_footer(s, "E", TOTAL)
 
 def slide_backup_db_schema():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Core relational schema (extract)", eyebrow="Backup F · Data model")
+    add_header_bar(s, "Schéma relationnel principal (extrait)", eyebrow="Annexe F · Modèle de données")
 
     rows = [
         ["users",          "id, username, email, password, is_driver, is_student, balance, score"],
@@ -1082,62 +1084,62 @@ def slide_backup_db_schema():
         ["messages",       "id, conversation_id*, sender_id*, body, is_read, sent_at"],
     ]
     add_table(s, Inches(0.5), Inches(1.6), Inches(12.3), Inches(4.8),
-              ["Table", "Columns"], rows, font_size=10, header_size=11)
+              ["Table", "Colonnes"], rows, font_size=10, header_size=11)
 
     add_text(s, Inches(0.5), Inches(6.55), Inches(12), Inches(0.4),
-             "* foreign key. ~20 tables total in the live schema. "
-             "Indexes on origin, destination, departure_time, foreign keys.",
+             "* clé étrangère. ~20 tables au total dans le schéma. "
+             "Index sur origin, destination, departure_time et clés étrangères.",
              size=11, color=MUTED, align=PP_ALIGN.CENTER)
     add_footer(s, "F", TOTAL)
 
 def slide_backup_api():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "REST API surface (extract)", eyebrow="Backup G · API contract")
+    add_header_bar(s, "Surface de l'API REST (extrait)", eyebrow="Annexe G · Contrat API")
 
     rows = [
-        ["POST",   "/api/auth/register",            "Create account"],
-        ["POST",   "/api/auth/login",               "Returns 32-byte bearer token"],
-        ["GET",    "/api/rides",                    "Search with from/to/date/filters"],
-        ["POST",   "/api/rides",                    "Driver publishes a ride"],
-        ["DELETE", "/api/rides/{id}",               "Driver cancels"],
-        ["POST",   "/api/bookings",                 "Passenger books — 50% prepayment"],
-        ["POST",   "/api/bookings/group",           "Group booking"],
-        ["POST",   "/api/bookings/validate-promo",  "Org promo code lookup"],
-        ["POST",   "/api/bookings/requests/{id}",   "Driver accepts/rejects"],
-        ["POST",   "/api/student/send-otp",         "Send OTP to university email"],
-        ["POST",   "/api/student/verify-otp",       "Verify OTP, mark verified"],
-        ["GET",    "/api/admin/organizations",      "List org accounts (admin)"],
-        ["POST",   "/api/admin/organizations/{id}/review", "Approve / reject org"],
-        ["GET",    "/api/feed",                     "Social feed (posts + interactions)"],
+        ["POST",   "/api/auth/register",            "Créer un compte"],
+        ["POST",   "/api/auth/login",               "Retourne un bearer token de 32 octets"],
+        ["GET",    "/api/rides",                    "Rechercher avec from/to/date/filtres"],
+        ["POST",   "/api/rides",                    "Le conducteur publie un trajet"],
+        ["DELETE", "/api/rides/{id}",               "Le conducteur annule"],
+        ["POST",   "/api/bookings",                 "Le passager réserve — acompte 50 %"],
+        ["POST",   "/api/bookings/group",           "Réservation de groupe"],
+        ["POST",   "/api/bookings/validate-promo",  "Vérification d'un code promo organisationnel"],
+        ["POST",   "/api/bookings/requests/{id}",   "Le conducteur accepte/refuse"],
+        ["POST",   "/api/student/send-otp",         "Envoyer un OTP à l'email universitaire"],
+        ["POST",   "/api/student/verify-otp",       "Vérifier l'OTP, marquer vérifié"],
+        ["GET",    "/api/admin/organizations",      "Lister les organisations (admin)"],
+        ["POST",   "/api/admin/organizations/{id}/review", "Approuver / rejeter une organisation"],
+        ["GET",    "/api/feed",                     "Fil social (posts + interactions)"],
     ]
     add_table(s, Inches(0.5), Inches(1.6), Inches(12.3), Inches(5.0),
-              ["Method", "Path", "Purpose"], rows, font_size=11, header_size=11)
+              ["Méthode", "Chemin", "Rôle"], rows, font_size=11, header_size=11)
 
     add_text(s, Inches(0.5), Inches(6.75), Inches(12), Inches(0.3),
-             "All protected endpoints require the Authorization: Bearer <token> header.",
+             "Tous les endpoints protégés requièrent l'en-tête Authorization: Bearer <token>.",
              size=11, color=MUTED, align=PP_ALIGN.CENTER)
     add_footer(s, "G", TOTAL)
 
 def slide_backup_security():
     s = prs.slides.add_slide(BLANK)
     page_bg(s)
-    add_header_bar(s, "Security posture", eyebrow="Backup H · Risk & mitigations")
+    add_header_bar(s, "Posture de sécurité", eyebrow="Annexe H · Risques & mitigations")
 
     rows = [
-        ["Password storage",        "bcrypt via PHP password_hash"],
-        ["Session",                 "Random 32-byte hex bearer token, 30-day TTL"],
-        ["Transport",               "HTTPS in production (XAMPP HTTP for dev)"],
-        ["SQL injection",           "PDO with parameterized queries everywhere"],
-        ["XSS",                     "Server-rendered output is escaped (htmlspecialchars)"],
-        ["CSRF (web admin)",        "Same-origin admin panel + session-based auth"],
-        ["Admin separation",        "Admin login blocked on the mobile API (web-only)"],
-        ["File uploads",            "Mime + size validation; served from /Src under XAMPP"],
-        ["Audit trail",             "Sensitive ops (verification, suspension) logged server-side"],
-        ["Rate limiting",           "OTP send has a 30s per-account cooldown"],
+        ["Stockage mots de passe",  "bcrypt via PHP password_hash"],
+        ["Session",                 "Bearer token aléatoire 32 octets hex, TTL 30 jours"],
+        ["Transport",               "HTTPS en production (HTTP via XAMPP en dev)"],
+        ["Injection SQL",           "PDO avec requêtes paramétrées partout"],
+        ["XSS",                     "Sortie serveur échappée (htmlspecialchars)"],
+        ["CSRF (admin web)",        "Panneau admin same-origin + session"],
+        ["Séparation admin",        "Connexion admin bloquée sur l'API mobile (web uniquement)"],
+        ["Téléversement fichiers",  "Validation mime + taille ; servi depuis /Src sous XAMPP"],
+        ["Journal d'audit",         "Opérations sensibles (vérif., suspension) tracées côté serveur"],
+        ["Limitation de débit",     "Envoi OTP : cooldown de 30 s par compte"],
     ]
     add_table(s, Inches(0.5), Inches(1.6), Inches(12.3), Inches(5.3),
-              ["Concern", "Mitigation"], rows, font_size=12, header_size=12)
+              ["Préoccupation", "Mitigation"], rows, font_size=12, header_size=12)
 
     add_footer(s, "H", TOTAL)
 
@@ -1159,106 +1161,111 @@ SPEAKER_NOTES = [
     # 1 — Title
     "Bonjour, je suis Youssef, voici Anas. Nous allons vous présenter "
     "ForsaDrive, notre PFE réalisé chez ATOMIC IT sous la supervision de "
-    "Mr. Khalil Selmi et Mme Ines Ben Nasr. ~30 s.",
+    "M. Khalil Selmi et Mme Ines Ben Nasr. ~30 s.",
 
     # 2 — Outline
-    "Walk the 7 sections quickly. Contexte, solutions existantes, notre "
-    "proposition, méthodologie Scrum, conception, réalisation sprint par "
-    "sprint, tests/demo, conclusion. ~30 s.",
+    "Parcourir les 7 sections rapidement. Contexte, solutions existantes, "
+    "notre proposition, méthodologie Scrum, conception, réalisation sprint "
+    "par sprint, tests/démo, conclusion. ~30 s.",
 
     # 3 — Problem
-    "Two anchors: students/workers travel a lot but have small budgets, "
-    "and private cars travel half empty. Read the problem statement quote "
-    "at the bottom — it's the thesis of the whole project. ~45 s.",
+    "Deux points d'ancrage : étudiants/travailleurs voyagent beaucoup mais "
+    "ont peu de budget, et les voitures privées roulent à moitié vides. "
+    "Lire la problématique en bas — c'est la thèse de tout le projet. ~45 s.",
 
     # 4 — Company
-    "Brief. They provided technical supervision AND the agile process. "
-    "Don't dwell, the jury cares about the project. ~30 s.",
+    "Court. Ils ont fourni l'encadrement technique ET le cadre agile. "
+    "Ne pas s'attarder, le jury s'intéresse au projet. ~30 s.",
 
     # 5 — Existing solutions
-    "Don't read the whole table. Pick one row: 'Look at student discount — "
-    "none of these have it. Wallet — none of these have it. That's our gap.' "
-    "End with the bold sentence. ~45 s.",
+    "Ne pas lire toute la table. Pointer une ligne : « Regardez la "
+    "réduction étudiante — aucune ne l'a. Portefeuille — aucune ne l'a. "
+    "C'est notre niche. » Finir avec la phrase en gras. ~45 s.",
 
     # 6 — Proposed solution
-    "Three pillars structure the rest of the talk. Numbers to memorize: "
-    "3 apps, 4 sprints, 20+ entities, 3 languages. ~45 s.",
+    "Les trois piliers structurent le reste de l'exposé. Chiffres à "
+    "retenir : 3 applis, 4 sprints, 20+ entités, 3 langues. ~45 s.",
 
     # 7 — Methodology (THE slide for the supervisor)
-    "THIS is the slide your supervisor cares about. Walk the timeline: "
-    "Sprint 0 was preparatory, four functional sprints, grouped into two "
-    "releases. Mention daily stand-ups and weekly reviews. ~1 min.",
+    "C'EST la diapo qui intéresse l'encadrant. Parcourir la frise : Sprint 0 "
+    "préparatoire, quatre sprints fonctionnels, groupés en deux releases. "
+    "Mentionner les stand-ups quotidiens et les revues hebdomadaires. ~1 min.",
 
     # 8 — Architecture
-    "Two clients, one backend, one DB. The business rules live in the "
-    "backend so they cannot be bypassed from the mobile side. Bearer "
-    "tokens, bcrypt, HTTPS. ~1 min.",
+    "Deux clients, un backend, une base. Les règles métier sont dans le "
+    "backend, donc impossible à contourner depuis le mobile. Bearer tokens, "
+    "bcrypt, HTTPS. ~1 min.",
 
     # 9 — Class diagram
-    "Do NOT read every class. Say: 20-something entities, organized into "
-    "five logical groups — users, trips, payments, verification, "
-    "communication. Refer the jury to the report for the detail. ~30 s.",
+    "NE PAS énumérer chaque classe. Dire : une vingtaine d'entités, "
+    "organisées en cinq groupes logiques — utilisateurs, trajets, paiements, "
+    "vérification, communication. Renvoyer au rapport pour le détail. ~30 s.",
 
     # 10 — Use case
-    "Same idea: don't enumerate. 'Four actors — passenger, driver, admin, "
-    "and the system itself for automated operations like discount "
-    "calculation and reliability scoring.' ~30 s.",
+    "Même principe : ne pas tout énumérer. « Quatre acteurs — passager, "
+    "conducteur, admin, et le système lui-même pour les opérations "
+    "automatiques comme le calcul de la réduction ou du score de fiabilité. » "
+    "~30 s.",
 
     # 11 — Sprint 1
-    "Read the mission (left rail). Highlight US1.4 (OTP) and US1.5 (driver "
-    "app) — they're the most interesting. Read the 3 deliverables. ~1 min.",
+    "Lire l'objectif (rail gauche). Mettre l'accent sur US1.4 (OTP) et "
+    "US1.5 (candidature conducteur) — les plus intéressants. Lire les "
+    "3 livrables. ~1 min.",
 
     # 12 — Sprint 2
-    "Mission, then highlight US2.6 (50% prepayment) and US2.7 (group "
-    "booking). Mention the cash collection step in the activity diagram — "
-    "shows you thought about the full flow, not just the happy path. ~1 min.",
+    "Objectif, puis pointer US2.6 (acompte 50 %) et US2.7 (réservation de "
+    "groupe). Mentionner la collecte cash dans le diagramme d'activité — "
+    "ça montre que vous avez pensé au flux complet, pas seulement au "
+    "scénario nominal. ~1 min.",
 
     # 13 — Sprint 3
-    "Highlight: 'The price pipeline bug found at the sprint review — we "
-    "applied the promo BEFORE the student discount, slightly favoring the "
-    "passenger. Fixed same evening + unit test added.' Shows you do real "
-    "reviews. ~1 min.",
+    "Insister : « Bug du pipeline de prix détecté en revue — la promo "
+    "s'appliquait AVANT la réduction étudiante, légèrement en faveur du "
+    "passager. Corrigé le soir même + test unitaire ajouté. » Ça prouve "
+    "que vous faites de vraies revues. ~1 min.",
 
     # 14 — Sprint 4
-    "Mention: chat is 3-second polling, no WebSocket — a deliberate "
-    "trade-off, not a limitation. HelpDesk bot covers 14 FAQ categories "
-    "with escalation. Arabic flips the layout automatically. ~1 min. "
-    "(You should be at ~12 min total by end of this slide.)",
+    "Mentionner : le chat est en polling 3 secondes, sans WebSocket — un "
+    "choix délibéré, pas une limite. Le bot HelpDesk couvre 14 catégories "
+    "FAQ avec escalade. L'arabe bascule automatiquement la mise en page. "
+    "~1 min. (Vous devriez être à ~12 min à la fin de cette diapo.)",
 
     # 15 — Selected screens
-    "Walk left to right: auth → search with match score → trip detail with "
-    "map → driver dashboard with reliability gauge. ~45 s.",
+    "De gauche à droite : auth → recherche avec score → détail trajet avec "
+    "carte → tableau de bord conducteur avec jauge de fiabilité. ~45 s.",
 
     # 16 — Mobile features
-    "If running long, SKIP this slide — the jury can read it. Otherwise: "
-    "push (FCM), interactive map (OSM + OSRM), in-app chat, multilingual "
-    "with auto RTL. ~30 s.",
+    "Si vous êtes en retard, SAUTER cette diapo — le jury peut lire. "
+    "Sinon : push (FCM), carte interactive (OSM + OSRM), chat intégré, "
+    "multilingue avec RTL automatique. ~30 s.",
 
     # 17 — Stack
-    "If running long, SKIP this too. One sentence per column: Web (PHP + "
-    "Bootstrap), Backend (PHP REST + bearer + SQLite WAL), Mobile (Flutter + "
-    "Provider + go_router + FCM). ~30 s.",
+    "Si en retard, SAUTER aussi. Une phrase par colonne : Web (PHP + "
+    "Bootstrap), Backend (PHP REST + bearer + SQLite WAL), Mobile "
+    "(Flutter + Provider + go_router + FCM). ~30 s.",
 
     # 18 — Tests
-    "'Tests were continuous, not deferred.' Mention the price-pipeline "
-    "unit suite specifically — that's where the Sprint 3 bug was locked. "
-    "~45 s.",
+    "« Les tests étaient continus, pas reportés. » Mentionner la suite "
+    "unitaire du pipeline de prix — c'est là que le bug du Sprint 3 a été "
+    "verrouillé. ~45 s.",
 
     # 19 — LIVE DEMO
-    "DEMO SCRIPT (3 min, 11 steps): (1) Register passenger on mobile. "
-    "(2) Type recognized university email → green banner. (3) Trigger OTP "
-    "verification. (4) Switch to web → driver session → publish Tunis-Sfax "
-    "ride. (5) Mobile → search Tunis Sfax → ride appears with match badge. "
-    "(6) Open ride detail → map + price breakdown with student discount. "
-    "(7) Book one seat → 50% prepayment confirmation. (8) Web → driver "
-    "accepts. (9) Mobile → booking confirmed in My Rides. (10) Open chat → "
-    "send 'On arrive dans 5 minutes'. (11) Show driver dashboard → "
-    "reliability gauge. FALLBACK: switch to PDF of screenshots and narrate.",
+    "SCRIPT DÉMO (3 min, 11 étapes) : (1) Inscription passager sur mobile. "
+    "(2) Taper un email universitaire reconnu → bannière verte. "
+    "(3) Déclencher la vérification OTP. (4) Passer sur le web → session "
+    "conducteur → publier un trajet Tunis-Sfax. (5) Mobile → rechercher "
+    "Tunis Sfax → le trajet apparaît avec le badge de score. (6) Ouvrir le "
+    "détail → carte + détail du prix avec la réduction étudiante. "
+    "(7) Réserver une place → confirmation de l'acompte 50 %. (8) Web → "
+    "le conducteur accepte. (9) Mobile → réservation confirmée dans Mes "
+    "Trajets. (10) Ouvrir le chat → envoyer « On arrive dans 5 minutes ». "
+    "(11) Tableau de bord conducteur → jauge de fiabilité. "
+    "SECOURS : basculer sur le PDF des captures et narrer.",
 
     # 20 — Limitations
-    "BE HONEST — jurors test honesty here. Acknowledge: wallet uses manual "
-    "top-ups, SQLite is for dev not production, iOS not verified. Then "
-    "pivot to the roadmap. ~1 min.",
+    "ÊTRE HONNÊTE — les jurys testent l'honnêteté ici. Reconnaître : "
+    "portefeuille par rechargement manuel, SQLite pour le dev pas la "
+    "prod, iOS non vérifié. Puis pivoter vers la feuille de route. ~1 min.",
 
     # 21 — Thanks
     "Nous vous remercions pour votre attention. Nous sommes prêts pour vos "
@@ -1268,7 +1275,7 @@ SPEAKER_NOTES = [
 for slide, note in zip(prs.slides, SPEAKER_NOTES):
     slide.notes_slide.notes_text_frame.text = note
 
-out = os.path.join(ROOT, "ForsaDrive_Defense.pptx")
+out = os.path.join(ROOT, "ForsaDrive_Defense_FR.pptx")
 prs.save(out)
 print(f"Wrote {out}")
 print(f"Slides: {len(prs.slides)}")

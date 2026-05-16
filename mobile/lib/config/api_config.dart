@@ -1,11 +1,21 @@
 class ApiConfig {
   /// PHP backend served by XAMPP.
-  /// For emulator use 'http://10.0.2.2/ForsaDrive/api'.
-  /// For a physical device replace with your PC's local IP, e.g. 'http://192.168.1.X/ForsaDrive/api'.
-  static const String baseUrl = 'http://10.0.2.2/ForsaDrive/api';
+  ///
+  /// Default targets the Android emulator loopback to the host (10.0.2.2).
+  /// Override at build/run time without editing this file:
+  ///   flutter run --dart-define=API_BASE=http://192.168.1.X/ForsaDrive
+  ///
+  /// Common values:
+  /// - Android emulator on the dev machine: leave default.
+  /// - Physical phone on same Wi-Fi: --dart-define with your PC's LAN IP.
+  /// - iOS simulator: --dart-define=API_BASE=http://localhost/ForsaDrive
+  static const String _base = String.fromEnvironment(
+    'API_BASE',
+    defaultValue: 'http://10.0.2.2/ForsaDrive',
+  );
 
-  /// Static uploads served by the same XAMPP vhost.
-  static const String uploadsUrl = 'http://10.0.2.2/ForsaDrive/Src';
+  static const String baseUrl    = '$_base/api';
+  static const String uploadsUrl = '$_base/Src';
 
   static String profilePicture(String? pic) {
     if (pic == null || pic.isEmpty) return '$uploadsUrl/default.jpg';
