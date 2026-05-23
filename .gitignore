@@ -6,20 +6,20 @@ web/Database/DB.db-shm
 web/.env
 
 # ── Mobile (Flutter) ──────────────────────────────────────────────────────────
-mobile/.dart_tool/
-mobile/.flutter-plugins
-mobile/.flutter-plugins-dependencies
-mobile/build/
-mobile/android/.gradle/
-mobile/android/local.properties
-mobile/android/app/google-services.json
-mobile/ios/.symlinks/
-mobile/ios/Pods/
-mobile/ios/Flutter/Flutter.framework
-mobile/ios/Flutter/Flutter.podspec
-mobile/coverage/
-mobile/*.g.dart
-mobile/**/*.g.dart
+ForsaDrive_PFE/forsa_drive_flutter/.dart_tool/
+ForsaDrive_PFE/forsa_drive_flutter/.flutter-plugins
+ForsaDrive_PFE/forsa_drive_flutter/.flutter-plugins-dependencies
+ForsaDrive_PFE/forsa_drive_flutter/build/
+ForsaDrive_PFE/forsa_drive_flutter/android/.gradle/
+ForsaDrive_PFE/forsa_drive_flutter/android/local.properties
+ForsaDrive_PFE/forsa_drive_flutter/android/app/google-services.json
+ForsaDrive_PFE/forsa_drive_flutter/ios/.symlinks/
+ForsaDrive_PFE/forsa_drive_flutter/ios/Pods/
+ForsaDrive_PFE/forsa_drive_flutter/ios/Flutter/Flutter.framework
+ForsaDrive_PFE/forsa_drive_flutter/ios/Flutter/Flutter.podspec
+ForsaDrive_PFE/forsa_drive_flutter/coverage/
+ForsaDrive_PFE/forsa_drive_flutter/*.g.dart
+ForsaDrive_PFE/forsa_drive_flutter/**/*.g.dart
 
 # ── General ───────────────────────────────────────────────────────────────────
 .DS_Store

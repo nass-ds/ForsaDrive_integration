@@ -46,7 +46,7 @@ open the same `web/Database/DB.db` file. There is **no second database**.
 | 4 | Added WAMP Apache alias at `C:\wamp64\alias\forsadrive.conf` mapping `/ForsaDrive` → the Desktop project folder. | The Mobile app's `api_config.dart` already points at `http://10.0.2.2/ForsaDrive/api`. Before this alias, WAMP only served an older copy at `/webPFE/ForsaDrive/ForsaDrive/` (which has no `api/` folder). Now both browser and emulator hit the same URL prefix → the same code → the same DB. |
 
 No source files in `web/Pages/`, `web/classes/`, `web/api/`, or anywhere under
-`mobile/lib/` were modified. Auditing them confirmed:
+`ForsaDrive_PFE/forsa_drive_flutter/lib/` were modified. Auditing them confirmed:
 
 - **Web Pages** already load everything via `getDB()` + `$_SESSION['user_id']`.
   No hardcoded/mock user data was found.
@@ -55,8 +55,8 @@ No source files in `web/Pages/`, `web/classes/`, `web/api/`, or anywhere under
   hardcoded/mock user data was found.
 
 The two `_kRoles` / `_orgTypes` / `routeLabels` constants in
-`mobile/lib/screens/organization/organization_screen.dart` and
-`mobile/lib/screens/landing/landing_screen.dart` are not user data — they are
+`ForsaDrive_PFE/forsa_drive_flutter/lib/screens/organization/organization_screen.dart` and
+`ForsaDrive_PFE/forsa_drive_flutter/lib/screens/landing/landing_screen.dart` are not user data — they are
 enum-like UI labels (role pickers, popular-route chips). They stay as-is.
 
 ---
@@ -91,7 +91,7 @@ curl -X POST http://localhost/ForsaDrive/api/auth/login `
 
 ### 3. Mobile app config
 
-`mobile/lib/config/api_config.dart` is already correct:
+`ForsaDrive_PFE/forsa_drive_flutter/lib/config/api_config.dart` is already correct:
 
 ```dart
 static const String baseUrl = 'http://10.0.2.2/ForsaDrive/api';
@@ -143,9 +143,9 @@ sessions only re-fetch the user row on full reload; mobile screens re-fetch on
 | API auth + token middleware | `web/api/helpers.php`  (`auth_user()`) |
 | API endpoints | `web/api/{auth,rides,bookings,users,payments,notifications,complaints,ratings,admin_api}.php` |
 | API clean-URL rewrite | `web/api/.htaccess` (already present, all-to-index.php) |
-| Mobile API base URL | `mobile/lib/config/api_config.dart` |
-| Mobile auth state | `mobile/lib/providers/auth_provider.dart` + `auth_service.dart` |
-| Mobile API client | `mobile/lib/services/api_service.dart` |
+| Mobile API base URL | `ForsaDrive_PFE/forsa_drive_flutter/lib/config/api_config.dart` |
+| Mobile auth state | `ForsaDrive_PFE/forsa_drive_flutter/lib/providers/auth_provider.dart` + `auth_service.dart` |
+| Mobile API client | `ForsaDrive_PFE/forsa_drive_flutter/lib/services/api_service.dart` |
 
 ---
 
