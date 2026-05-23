@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../server/session.php';
 require_once __DIR__ . '/../server/language.php';
+require_once __DIR__ . '/../server/boost_tiers.php';
 
 requireRegularUser();
 
@@ -70,31 +71,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $flash = 'Post deleted.'; $flashType = 'success';
         }
 
-        // ── Boost post (5 TND) ───────────────────────────────────────────────
+        // ── Boost post (tiered §3.2) ──────────────────────────────────────────
         elseif (isset($_POST['boost_post'])) {
             $postId = (int)$_POST['boost_post'];
-            $check  = $db->prepare("SELECT user_id, is_boosted FROM feed_posts WHERE id=?");
+            $tier   = boost_tier($_POST['boost_tier'] ?? null);
+            if (!$tier) throw new RuntimeException('Please choose a valid boost duration.');
+
+            $check  = $db->prepare("SELECT user_id, " . boost_active_sql() . " AS is_boosted_active FROM feed_posts p WHERE id=?");
             $check->execute([$postId]);
             $r = $check->fetch(PDO::FETCH_ASSOC);
             if (!$r) throw new RuntimeException('Post not found.');
             if ((int)$r['user_id'] !== $uid) throw new RuntimeException('You can only boost your own posts.');
-            if ((int)$r['is_boosted'] === 1) throw new RuntimeException('Already boosted.');
+            if ((int)$r['is_boosted_active'] === 1) throw new RuntimeException('Already boosted.');
 
+            $price = (float)$tier['price'];
             $bal = (float)$db->query("SELECT balance FROM users WHERE id=$uid")->fetchColumn();
-            if ($bal < 5.0) throw new RuntimeException('Insufficient balance — boosting costs 5 TND.');
+            if ($bal < $price) throw new RuntimeException(sprintf('Insufficient balance — this boost costs %s TND.', rtrim(rtrim(number_format($price, 2), '0'), '.')));
 
             $db->beginTransaction();
             try {
-                $db->prepare("UPDATE users SET balance = balance - 5 WHERE id=?")->execute([$uid]);
+                $db->prepare("UPDATE users SET balance = balance - ? WHERE id=?")->execute([$price, $uid]);
                 $db->prepare("INSERT INTO payments (user_id, amount, type, description, ref_id)
-                              VALUES (?, -5, 'charge', 'Feed post boost', ?)")
-                    ->execute([$uid, $postId]);
-                $db->prepare("UPDATE feed_posts SET is_boosted=1, boosted_at=datetime('now') WHERE id=?")
-                    ->execute([$postId]);
+                              VALUES (?, ?, 'charge', ?, ?)")
+                    ->execute([$uid, -$price, 'Feed boost (' . $tier['label'] . ')', $postId]);
+                $db->prepare("UPDATE feed_posts
+                              SET is_boosted=1, boost_tier=?, boosted_at=datetime('now'),
+                                  boost_expires_at=datetime('now', ?)
+                              WHERE id=?")
+                    ->execute([$tier['key'], $tier['sql_modifier'], $postId]);
                 $db->commit();
             } catch (Throwable $e) { $db->rollBack(); throw $e; }
-            $_SESSION['user_data']['balance'] = $bal - 5;
-            $flash = 'Post boosted!'; $flashType = 'success';
+            $_SESSION['user_data']['balance'] = $bal - $price;
+            $flash = 'Post boosted for ' . $tier['label'] . '!'; $flashType = 'success';
         }
 
         // ── Add comment ──────────────────────────────────────────────────────
@@ -141,6 +149,7 @@ $openComments = (int)($_GET['open'] ?? 0);
 
 $sql = "
     SELECT p.*,
+           " . boost_active_sql('p') . " AS is_boosted_active,
            u.username       AS author_name,
            u.picture        AS author_pic,
            u.score          AS author_score,
@@ -154,10 +163,13 @@ if ($type !== 'all') {
     $sql .= " WHERE p.type = ?";
     $params[] = $type;
 }
-$sql .= " ORDER BY p.is_boosted DESC, p.created_at DESC LIMIT 100";
+$sql .= " ORDER BY is_boosted_active DESC, p.created_at DESC LIMIT 100";
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Surface the *active* boost state so expired boosts render as normal posts
+foreach ($posts as &$_p) { $_p['is_boosted'] = (int)$_p['is_boosted_active']; }
+unset($_p);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function feedTimeAgo(string $datetime): string {
@@ -251,6 +263,12 @@ include __DIR__ . '/../include/sidebar.php';
     .post-actions button:hover, .post-actions a:hover { background: #f1f5f9; }
     .post-actions .liked { color: #dc2626; }
     .post-actions .boost-btn { color: #b45309; }
+    .post-actions .boost-form { display: inline-flex; align-items: center; gap: .35rem; }
+    .post-actions .boost-tier-select {
+        font-size: .72rem; font-weight: 600; color: #92400e;
+        background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px;
+        padding: .2rem .4rem; cursor: pointer;
+    }
     .post-actions .book-btn {
         margin-left: auto;
         background: #0d6efd; color: #fff;
@@ -418,9 +436,17 @@ include __DIR__ . '/../include/sidebar.php';
                         <i class="far fa-comment"></i> <?= (int)$p['comments_count'] ?>
                     </a>
                     <?php if ($isOwner && (int)$p['is_boosted'] !== 1): ?>
-                        <form method="POST" class="d-inline"
-                              onsubmit="return confirm('Boost this post for 5 TND from your wallet?')">
-                            <button name="boost_post" value="<?= (int)$p['id'] ?>" class="boost-btn" title="Boost (5 TND)">
+                        <form method="POST" class="d-inline boost-form"
+                              onsubmit="return confirm('Boost this post with the selected tier? The fee is deducted from your wallet.')">
+                            <select name="boost_tier" class="boost-tier-select" required title="Boost duration">
+                                <?php foreach (BOOST_TIERS as $key => $t):
+                                    $price = rtrim(rtrim(number_format($t['price'], 2), '0'), '.'); ?>
+                                    <option value="<?= htmlspecialchars($key) ?>">
+                                        <?= htmlspecialchars($t['label']) ?> · <?= $price ?> DT
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <button name="boost_post" value="<?= (int)$p['id'] ?>" class="boost-btn" title="Boost">
                                 <i class="fas fa-bolt"></i> Boost
                             </button>
                         </form>

@@ -94,8 +94,78 @@ CREATE TABLE users (
     referred_by          INTEGER REFERENCES users(id) ON DELETE SET NULL,
     suspended            INTEGER DEFAULT 0,
     ban_reason           TEXT,
+    suspended_until      DATETIME,
+    warnings_count       INTEGER DEFAULT 0,
     created_at           DATETIME DEFAULT CURRENT_TIMESTAMP
 )", "Create users", $ok, $err);
+
+run($pdo, "
+CREATE TABLE audit_logs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action      TEXT NOT NULL,
+    target_type TEXT,
+    target_id   INTEGER,
+    summary     TEXT,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+)", "Create audit_logs", $ok, $err);
+
+run($pdo, "
+CREATE TABLE announcements (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    title      TEXT NOT NULL,
+    body       TEXT NOT NULL,
+    audience   TEXT NOT NULL DEFAULT 'all',
+    sent_count INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)", "Create announcements", $ok, $err);
+
+run($pdo, "
+CREATE TABLE promo_codes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    code       TEXT NOT NULL UNIQUE,
+    amount     REAL NOT NULL,
+    max_uses   INTEGER DEFAULT 0,
+    used_count INTEGER DEFAULT 0,
+    expires_at DATETIME,
+    is_active  INTEGER DEFAULT 1,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)", "Create promo_codes", $ok, $err);
+
+run($pdo, "
+CREATE TABLE promo_redemptions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    promo_id   INTEGER NOT NULL REFERENCES promo_codes(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount     REAL NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(promo_id, user_id)
+)", "Create promo_redemptions", $ok, $err);
+
+run($pdo, "
+CREATE TABLE password_resets (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    used_at    DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)", "Create password_resets", $ok, $err);
+
+run($pdo, "
+CREATE TABLE user_sanctions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    admin_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    type       TEXT NOT NULL
+               CHECK (type IN ('warning','suspension','ban','lift')),
+    reason     TEXT,
+    days       INTEGER,
+    expires_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)", "Create user_sanctions", $ok, $err);
 
 run($pdo, "
 CREATE TABLE vehicles (
@@ -311,6 +381,8 @@ CREATE TABLE feed_posts (
     ride_id         INTEGER REFERENCES rides(id) ON DELETE SET NULL,
     is_boosted      INTEGER DEFAULT 0,
     boosted_at      DATETIME,
+    boost_tier      TEXT,
+    boost_expires_at DATETIME,
     likes_count     INTEGER DEFAULT 0,
     comments_count  INTEGER DEFAULT 0,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP

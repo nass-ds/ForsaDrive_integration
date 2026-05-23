@@ -1,5 +1,6 @@
 <?php
 require_once '../server/session.php';
+require_once '../classes/sanctions.php';
 
 // Redirect if already logged in
 if (isLoggedIn()) {
@@ -48,10 +49,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($user && password_verify($password, $user['password'])) {
 
-                // Suspended check
-                if (!empty($user['suspended'])) {
-                    $reason = htmlspecialchars($user['ban_reason'] ?? 'No reason provided.');
-                    $errors[] = "Your account has been suspended. Reason: {$reason}";
+                // Progressive sanctions (§2.4): auto-lift an elapsed suspension,
+                // then block if a suspension or ban is still in force.
+                Sanctions::applyExpiry($pdo, $user);
+                if ($lockout = Sanctions::lockoutMessage($user)) {
+                    $errors[] = htmlspecialchars($lockout);
                 } else {
                     // Populate session manually (full dataset as specified)
                     $_SESSION['user_id']   = $user['id'];
@@ -323,7 +325,7 @@ $oldEmail   = htmlspecialchars($_POST['email'] ?? '');
             <div class="mb-3">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <label class="form-label fd-form-label mb-0">Password</label>
-                    <a href="#" class="forgot-link">Forgot password?</a>
+                    <a href="forgot_password.php" class="forgot-link">Forgot password?</a>
                 </div>
                 <div class="input-group">
                     <span class="input-group-text"><i class="fa fa-lock"></i></span>

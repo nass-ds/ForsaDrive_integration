@@ -6,10 +6,13 @@
  *   POST /feed/                      create a post
  *   POST /feed/like                  toggle like {post_id}
  *   POST /feed/delete                delete own post {post_id}
- *   POST /feed/boost                 boost a post (5 TND) {post_id}
+ *   POST /feed/boost                 boost a post {post_id, tier}      (tiered §3.2)
+ *   POST /feed/boost-ride            boost a ride to the feed {ride_id, tier}
  *   GET  /feed/comments              list comments for ?post_id=
  *   POST /feed/comment               add a comment {post_id, body}
  */
+
+require_once __DIR__ . '/../server/boost_tiers.php';
 
 $action = $segments[1] ?? '';
 $user   = auth_user();
@@ -26,6 +29,7 @@ function feed_pic(?string $raw): ?string {
 function fetch_post(PDO $pdo, int $postId, int $viewerId): ?array {
     $stmt = $pdo->prepare("
         SELECT p.*,
+               " . boost_active_sql('p') . " AS is_boosted_active,
                u.username      AS author_name,
                u.picture       AS author_pic,
                u.score         AS author_score,
@@ -41,7 +45,9 @@ function fetch_post(PDO $pdo, int $postId, int $viewerId): ?array {
     $row['id']          = (int)$row['id'];
     $row['user_id']     = (int)$row['user_id'];
     $row['seats']       = (int)$row['seats'];
-    $row['is_boosted']  = (int)$row['is_boosted'];
+    // is_boosted reflects the *active* state (expired boosts read as 0)
+    $row['is_boosted']  = (int)$row['is_boosted_active'];
+    unset($row['is_boosted_active']);
     $row['likes_count'] = (int)$row['likes_count'];
     $row['comments_count'] = (int)$row['comments_count'];
     $row['is_liked']    = (bool)$row['is_liked'];
@@ -50,6 +56,43 @@ function fetch_post(PDO $pdo, int $postId, int $viewerId): ?array {
     $row['author_is_student'] = (int)$row['author_is_student'];
     if ($row['ride_id'] !== null) $row['ride_id'] = (int)$row['ride_id'];
     return $row;
+}
+
+/**
+ * Charge the user the tier price and (re)boost their post for the tier's
+ * duration, all in one transaction. Returns the new boost_expires_at string.
+ * Sends a JSON error and exits on insufficient balance or DB failure.
+ */
+function boost_post(PDO $pdo, int $uid, int $postId, array $tier): string {
+    $price = (float)$tier['price'];
+    $bal   = (float)$pdo->query("SELECT balance FROM users WHERE id=$uid")->fetchColumn();
+    if ($bal < $price) {
+        json_error(sprintf('Insufficient balance — this boost costs %s TND', rtrim(rtrim(number_format($price, 2), '0'), '.')), 402);
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("UPDATE users SET balance = balance - ? WHERE id = ?")
+            ->execute([$price, $uid]);
+        $pdo->prepare("INSERT INTO payments (user_id, amount, type, description, ref_id)
+                       VALUES (?, ?, 'charge', ?, ?)")
+            ->execute([$uid, -$price, 'Feed boost (' . $tier['label'] . ')', $postId]);
+        $pdo->prepare("
+            UPDATE feed_posts
+            SET is_boosted = 1,
+                boost_tier = ?,
+                boosted_at = datetime('now'),
+                boost_expires_at = datetime('now', ?)
+            WHERE id = ?
+        ")->execute([$tier['key'] ?? null, $tier['sql_modifier'], $postId]);
+        $expiresAt = (string)$pdo->query("SELECT boost_expires_at FROM feed_posts WHERE id=$postId")->fetchColumn();
+        $pdo->commit();
+        return $expiresAt;
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        json_error('Boost failed: ' . $e->getMessage(), 500);
+    }
+    return ''; // unreachable
 }
 
 $pdo = db();
@@ -61,6 +104,7 @@ switch ($method . ':' . $action) {
         $type = $_GET['type'] ?? null;
         $sql  = "
             SELECT p.*,
+                   " . boost_active_sql('p') . " AS is_boosted_active,
                    u.username       AS author_name,
                    u.picture        AS author_pic,
                    u.score          AS author_score,
@@ -74,7 +118,7 @@ switch ($method . ':' . $action) {
             $sql .= " WHERE p.type = ?";
             $params[] = $type;
         }
-        $sql .= " ORDER BY p.is_boosted DESC, p.created_at DESC LIMIT 100";
+        $sql .= " ORDER BY is_boosted_active DESC, p.created_at DESC LIMIT 100";
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -84,7 +128,9 @@ switch ($method . ':' . $action) {
             $r['id']             = (int)$r['id'];
             $r['user_id']        = (int)$r['user_id'];
             $r['seats']          = (int)$r['seats'];
-            $r['is_boosted']     = (int)$r['is_boosted'];
+            // is_boosted reflects the *active* state (expired boosts read as 0)
+            $r['is_boosted']     = (int)$r['is_boosted_active'];
+            unset($r['is_boosted_active']);
             $r['likes_count']    = (int)$r['likes_count'];
             $r['comments_count'] = (int)$r['comments_count'];
             $r['is_liked']       = (bool)$r['is_liked'];
@@ -172,36 +218,86 @@ switch ($method . ':' . $action) {
         json_ok(['deleted' => true]);
     }
 
-    // ── Boost a post (costs 5 TND, deducts from wallet) ───────────────
+    // ── Boost a post (tiered §3.2, deducts from wallet) ───────────────
     case 'POST:boost': {
-        $b = require_fields(['post_id']);
+        $b = require_fields(['post_id', 'tier']);
         $postId = (int)$b['post_id'];
+        $tier   = boost_tier($b['tier'] ?? null);
+        if (!$tier) json_error('Invalid boost tier', 422);
 
-        $check = $pdo->prepare("SELECT user_id, is_boosted FROM feed_posts WHERE id=?");
+        $check = $pdo->prepare("
+            SELECT user_id, " . boost_active_sql() . " AS is_boosted_active
+            FROM feed_posts p WHERE id = ?
+        ");
         $check->execute([$postId]);
         $row = $check->fetch(PDO::FETCH_ASSOC);
         if (!$row) json_error('Post not found', 404);
         if ((int)$row['user_id'] !== $uid) json_error('You can only boost your own posts', 403);
-        if ((int)$row['is_boosted'] === 1) json_error('Post is already boosted', 409);
+        if ((int)$row['is_boosted_active'] === 1) json_error('Post is already boosted', 409);
 
-        // Wallet check
-        $bal = (float)$pdo->query("SELECT balance FROM users WHERE id=$uid")->fetchColumn();
-        if ($bal < 5.0) json_error('Insufficient balance — boosting costs 5 TND', 402);
+        $expiresAt = boost_post($pdo, $uid, $postId, $tier);
+        $newBal = (float)$pdo->query("SELECT balance FROM users WHERE id=$uid")->fetchColumn();
+        json_ok([
+            'boosted'          => true,
+            'new_balance'      => $newBal,
+            'boost_tier'       => $b['tier'],
+            'boost_expires_at' => $expiresAt,
+        ]);
+    }
 
-        $pdo->beginTransaction();
-        try {
-            $pdo->prepare("UPDATE users SET balance = balance - 5 WHERE id = ?")->execute([$uid]);
-            $pdo->prepare("INSERT INTO payments (user_id, amount, type, description, ref_id)
-                           VALUES (?, -5, 'charge', 'Feed post boost', ?)")
-                ->execute([$uid, $postId]);
-            $pdo->prepare("UPDATE feed_posts SET is_boosted = 1, boosted_at = datetime('now') WHERE id = ?")
-                ->execute([$postId]);
-            $pdo->commit();
-        } catch (Throwable $e) {
-            $pdo->rollBack();
-            json_error('Boost failed: ' . $e->getMessage(), 500);
+    // ── Boost a ride to the feed (tiered §3.2) ────────────────────────
+    // Finds the driver's existing feed post for the ride, or creates one,
+    // then boosts it. {ride_id, tier}
+    case 'POST:boost-ride': {
+        $b = require_fields(['ride_id', 'tier']);
+        $rideId = (int)$b['ride_id'];
+        $tier   = boost_tier($b['tier'] ?? null);
+        if (!$tier) json_error('Invalid boost tier', 422);
+
+        $rideStmt = $pdo->prepare(
+            "SELECT id, driver_id, from_location, to_location, departure_time
+             FROM rides WHERE id = ?"
+        );
+        $rideStmt->execute([$rideId]);
+        $ride = $rideStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$ride) json_error('Ride not found', 404);
+        if ((int)$ride['driver_id'] !== $uid) json_error('You can only boost your own rides', 403);
+
+        // Find an existing feed post for this ride, or create one
+        $find = $pdo->prepare("
+            SELECT id, " . boost_active_sql() . " AS is_boosted_active
+            FROM feed_posts p WHERE ride_id = ? AND user_id = ?
+        ");
+        $find->execute([$rideId, $uid]);
+        $existing = $find->fetch(PDO::FETCH_ASSOC);
+
+        if ($existing) {
+            $postId = (int)$existing['id'];
+            if ((int)$existing['is_boosted_active'] === 1) json_error('This ride is already boosted', 409);
+        } else {
+            $content = sprintf('Ride: %s → %s', $ride['from_location'], $ride['to_location']);
+            $pdo->prepare("
+                INSERT INTO feed_posts
+                  (user_id, type, content, from_location, to_location, departure_date, ride_id)
+                VALUES (?, 'driver_offer', ?, ?, ?, ?, ?)
+            ")->execute([
+                $uid, $content,
+                $ride['from_location'], $ride['to_location'],
+                $ride['departure_time'] ? substr($ride['departure_time'], 0, 10) : null,
+                $rideId,
+            ]);
+            $postId = (int)$pdo->lastInsertId();
         }
-        json_ok(['boosted' => true, 'new_balance' => $bal - 5]);
+
+        $expiresAt = boost_post($pdo, $uid, $postId, $tier);
+        $newBal = (float)$pdo->query("SELECT balance FROM users WHERE id=$uid")->fetchColumn();
+        json_ok([
+            'boosted'          => true,
+            'post_id'          => $postId,
+            'new_balance'      => $newBal,
+            'boost_tier'       => $b['tier'],
+            'boost_expires_at' => $expiresAt,
+        ]);
     }
 
     // ── List comments for a post ──────────────────────────────────────

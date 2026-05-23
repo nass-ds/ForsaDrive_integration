@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
 import '../../config/api_config.dart';
+import '../../widgets/boost_tier_picker.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -88,38 +89,17 @@ class _FeedScreenState extends State<FeedScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _boostPost(Map<String, dynamic> post) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(children: [
-          Icon(Icons.bolt, color: Colors.amber),
-          SizedBox(width: 8),
-          Text('Boost this Post'),
-        ]),
-        content: const Text(
-          'Boosting costs 5 TND from your wallet.\n\nYour post will jump to the top of the feed for all users.',
-          style: TextStyle(height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.white,
-            ),
-            icon: const Icon(Icons.bolt, size: 16),
-            label: const Text('Boost for 5 TND'),
-            onPressed: () => Navigator.pop(ctx, true),
-          ),
-        ],
-      ),
+    final tier = await showBoostTierPicker(
+      context,
+      title: 'Boost this Post',
+      subtitle:
+          'Pick how long your post stays pinned to the top of the feed. The fee is deducted from your wallet.',
     );
-    if (confirmed != true || !mounted) return;
+    if (tier == null || !mounted) return;
     try {
-      await context.read<ApiService>().post('/feed/boost', {'post_id': post['id']});
+      await context
+          .read<ApiService>()
+          .post('/feed/boost', {'post_id': post['id'], 'tier': tier});
       if (mounted) {
         setState(() => post['is_boosted'] = 1);
         ScaffoldMessenger.of(context).showSnackBar(

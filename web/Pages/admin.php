@@ -3,6 +3,10 @@ require_once '../server/session.php';
 require_once '../server/language.php';
 require_once '../classes/complaints.php';
 require_once '../classes/notifications.php';
+require_once '../classes/sanctions.php';
+require_once '../classes/audit_log.php';
+require_once '../classes/announcements.php';
+require_once '../classes/promo_codes.php';
 
 if (!isLoggedIn() || empty($_SESSION['user_data']['is_admin'])) {
     header('Location: interface.php'); exit();
@@ -12,9 +16,30 @@ $db    = getDB();
 $uid   = $_SESSION['user_id'];
 $notif = new Notifications($db);
 $comp  = new Complaints($db);
+$sanct = new Sanctions($db, $notif);
+$audit    = new AuditLog($db);
+$announce = new Announcement($db);
+$promo    = new PromoCodes($db);
 
 $msg = ''; $msgType = '';
 $tab = $_GET['tab'] ?? 'overview';
+
+// ── Legacy-link redirects (keep old URLs working after the sidebar refactor) ──
+if ($tab === 'student_queue') {
+    header('Location: admin.php?tab=verifications&type=students'); exit();
+}
+if ($tab === 'vehicle_queue') {
+    header('Location: admin.php?tab=verifications&type=vehicles'); exit();
+}
+
+// ── Sub-filters used by the refactored tabs ──────────────────────────────────
+$validRoles       = ['all', 'driver', 'student', 'agent', 'admin'];
+$roleParam        = $_GET['role'] ?? 'all';
+$role             = in_array($roleParam, $validRoles, true) ? $roleParam : 'all';
+
+$validVerifyTypes = ['students', 'vehicles', 'drivers', 'organizations'];
+$typeParam        = $_GET['type'] ?? 'students';
+$verifyType       = in_array($typeParam, $validVerifyTypes, true) ? $typeParam : 'students';
 
 // ── POST actions ─────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -22,16 +47,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $targetId = (int)($_POST['target_id'] ?? 0);
 
     switch ($action) {
-        case 'ban_user':
-            $reason = trim($_POST['ban_reason'] ?? 'Policy violation');
-            $db->prepare("UPDATE users SET suspended=1, ban_reason=? WHERE id=? AND is_admin=0")->execute([$reason, $targetId]);
-            $notif->create($targetId, 'Account Suspended', "Your account has been suspended. Reason: $reason", 'danger');
-            $msg = 'User suspended.'; $msgType = 'success'; $tab = 'users'; break;
+        // ── Progressive sanctions (§2.4): Warning → Suspension → Ban ──────────
+        case 'warn_user':
+            $sanct->warn($targetId, $uid, trim($_POST['reason'] ?? ''));
+            $msg = 'Warning issued.'; $msgType = 'success'; $tab = 'users'; break;
 
-        case 'unban_user':
-            $db->prepare("UPDATE users SET suspended=0, ban_reason=NULL WHERE id=?")->execute([$targetId]);
-            $notif->create($targetId, 'Account Reinstated', 'Your account has been reinstated. Welcome back!', 'success');
-            $msg = 'User reinstated.'; $msgType = 'success'; $tab = 'users'; break;
+        case 'suspend_user':
+            $days    = (int)($_POST['days'] ?? Sanctions::MIN_SUSPENSION_DAYS);
+            $applied = $sanct->suspend($targetId, $uid, $days, trim($_POST['reason'] ?? ''));
+            $msg = "User suspended for {$applied} days."; $msgType = 'success'; $tab = 'users'; break;
+
+        case 'ban_user':
+            $sanct->ban($targetId, $uid, trim($_POST['reason'] ?? $_POST['ban_reason'] ?? ''));
+            $msg = 'User permanently banned.'; $msgType = 'success'; $tab = 'users'; break;
+
+        case 'unban_user':   // legacy alias kept for old links/forms
+        case 'lift_user':
+            $sanct->lift($targetId, $uid);
+            $msg = 'Sanction lifted — user reinstated.'; $msgType = 'success'; $tab = 'users'; break;
 
         case 'make_driver':
             $db->prepare("UPDATE users SET is_driver=1 WHERE id=?")->execute([$targetId]);
@@ -138,6 +171,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $notif->create($vOwner, 'Vehicle Verification Failed', "Your vehicle could not be verified. Reason: $note. Please upload a clearer photo of your carte grise.", 'danger');
             }
             $msg = 'Vehicle rejected.'; $msgType = 'danger'; $tab = 'vehicle_queue'; break;
+
+        // ── Broadcast announcements (§2.4) ────────────────────────────────────
+        case 'broadcast_announcement':
+            $aTitle    = trim($_POST['title'] ?? '');
+            $aBody     = trim($_POST['body'] ?? '');
+            $aAudience = $_POST['audience'] ?? 'all';
+            if ($aTitle === '' || $aBody === '') {
+                $msg = 'Title and message are required.'; $msgType = 'danger';
+            } else {
+                $sent = $announce->broadcast($uid, $aTitle, $aBody, $aAudience);
+                $msg  = "Announcement sent to {$sent} " . strtolower(Announcement::audienceLabel($aAudience)) . '.';
+                $msgType = 'success';
+            }
+            $tab = 'announcements'; break;
+
+        // ── Promo codes (§2.4) ────────────────────────────────────────────────
+        case 'create_promo':
+            [$pOk, $pMsg] = $promo->create(
+                $uid,
+                $_POST['code'] ?? '',
+                (float)($_POST['amount'] ?? 0),
+                (int)($_POST['max_uses'] ?? 0),
+                trim($_POST['expires_at'] ?? '') ?: null
+            );
+            $msg = $pMsg; $msgType = $pOk ? 'success' : 'danger'; $tab = 'promos'; break;
+
+        case 'toggle_promo':
+            $promo->setActive($targetId, !empty($_POST['activate']));
+            $msg = !empty($_POST['activate']) ? 'Promo code activated.' : 'Promo code deactivated.';
+            $msgType = 'success'; $tab = 'promos'; break;
+    }
+
+    // Audit trail (§2.4): record every admin mutation with its outcome.
+    if ($action !== '') {
+        $audit->log($uid, $action, null, $targetId ?: null, trim(strip_tags($msg)) ?: null);
     }
 
     header("Location: admin.php?tab=$tab&msg=" . urlencode($msg) . "&mt=$msgType"); exit();
@@ -153,16 +221,76 @@ $stats = [
     'bookings'        => $db->query("SELECT COUNT(*) FROM bookings")->fetchColumn(),
     'complaints'      => $db->query("SELECT COUNT(*) FROM complaints WHERE status='open'")->fetchColumn(),
     'pending_ver'     => $db->query("SELECT COUNT(*) FROM student_verifications WHERE status='pending'")->fetchColumn(),
-    'pending_student' => $db->query("SELECT COUNT(*) FROM student_verifications WHERE status='pending'")->fetchColumn(),
+    'pending_student' => $db->query("SELECT COUNT(*) FROM users WHERE student_status='pending'")->fetchColumn(),
     'student_domains' => $db->query("SELECT COUNT(*) FROM student_domains")->fetchColumn(),
     'pending_vehicle' => $db->query("SELECT COUNT(*) FROM vehicles WHERE verified=0 AND id_card_photo IS NOT NULL AND id_card_photo != ''")->fetchColumn(),
+    'pending_org'     => $db->query("SELECT COUNT(*) FROM organizations WHERE status='pending'")->fetchColumn(),
     'orgs'            => $db->query("SELECT COUNT(*) FROM organizations WHERE status='pending'")->fetchColumn(),
+    'vehicles_total'  => $db->query("SELECT COUNT(*) FROM vehicles")->fetchColumn(),
     'revenue'         => $db->query("SELECT COALESCE(SUM(paid_amount),0) FROM bookings WHERE status='completed'")->fetchColumn(),
 ];
+// Combined badge for the new Verifications entry in the sidebar
+$stats['pending_total'] = (int)$stats['pending_ver']
+                       + (int)$stats['pending_student']
+                       + (int)$stats['pending_vehicle']
+                       + (int)$stats['pending_org'];
 
 $vtypes         = $db->query("SELECT type, COUNT(*) cnt FROM vehicles GROUP BY type ORDER BY cnt DESC")->fetchAll(PDO::FETCH_ASSOC);
 $rstats         = $db->query("SELECT status, COUNT(*) cnt FROM rides GROUP BY status")->fetchAll(PDO::FETCH_ASSOC);
-$users          = $db->query("SELECT u.*, dp.avg_rating, dp.total_trips FROM users u LEFT JOIN driver_profiles dp ON dp.user_id=u.id WHERE u.is_admin=0 ORDER BY u.created_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+
+// ── Users — role-filtered ────────────────────────────────────────────────────
+$userWheres = [];
+if ($role === 'driver')   $userWheres[] = "u.is_driver=1 AND u.is_admin=0";
+elseif ($role === 'student') $userWheres[] = "u.is_student=1 AND u.is_admin=0";
+elseif ($role === 'agent') $userWheres[] = "u.is_helpdesk_agent=1 AND u.is_admin=0";
+elseif ($role === 'admin') $userWheres[] = "u.is_admin=1";
+else                       $userWheres[] = "u.is_admin=0";  // 'all' excludes admins by default
+
+$userSql = "SELECT u.*, dp.avg_rating, dp.total_trips
+            FROM users u
+            LEFT JOIN driver_profiles dp ON dp.user_id=u.id
+            WHERE " . implode(' AND ', $userWheres) . "
+            ORDER BY u.created_at DESC LIMIT 100";
+$users   = $db->query($userSql)->fetchAll(PDO::FETCH_ASSOC);
+
+// ── Sanction history for the listed users (one query, grouped) (§2.4) ────────
+$sanctionsByUser = [];   // user_id => [rows newest-first]
+$sanctionCounts  = [];   // user_id => [type => count]
+$userIds = array_map(fn($u) => (int)$u['id'], $users);
+if ($userIds) {
+    $in   = implode(',', array_fill(0, count($userIds), '?'));
+    $sRows = $db->prepare("SELECT s.*, a.username AS admin_name
+                           FROM user_sanctions s
+                           LEFT JOIN users a ON a.id = s.admin_id
+                           WHERE s.user_id IN ($in)
+                           ORDER BY s.created_at DESC");
+    $sRows->execute($userIds);
+    foreach ($sRows->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $sanctionsByUser[$r['user_id']][] = $r;
+        $sanctionCounts[$r['user_id']][$r['type']] = ($sanctionCounts[$r['user_id']][$r['type']] ?? 0) + 1;
+    }
+}
+
+// Per-role counters for the filter chips
+$roleCounts = [
+    'all'     => (int)$db->query("SELECT COUNT(*) FROM users WHERE is_admin=0")->fetchColumn(),
+    'driver'  => (int)$db->query("SELECT COUNT(*) FROM users WHERE is_driver=1 AND is_admin=0")->fetchColumn(),
+    'student' => (int)$db->query("SELECT COUNT(*) FROM users WHERE is_student=1 AND is_admin=0")->fetchColumn(),
+    'agent'   => (int)$db->query("SELECT COUNT(*) FROM users WHERE is_helpdesk_agent=1 AND is_admin=0")->fetchColumn(),
+    'admin'   => (int)$db->query("SELECT COUNT(*) FROM users WHERE is_admin=1")->fetchColumn(),
+];
+
+// ── All vehicles directory (for the new OPERATIONS > Vehicles page) ──────────
+$allVehicles = $db->query("
+    SELECT v.*, u.username AS owner_name, u.email AS owner_email
+    FROM vehicles v
+    JOIN users u ON u.id = v.user_id
+    ORDER BY v.created_at DESC
+    LIMIT 200
+")->fetchAll(PDO::FETCH_ASSOC);
+
+// ── Pending organizations only (for Verifications > Organizations sub-tab) ───
+$pendingOrgs = $db->query("SELECT * FROM organizations WHERE status='pending' ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 $verifications  = $db->query("SELECT sv.*, u.username, u.email, u.governorate FROM student_verifications sv JOIN users u ON u.id=sv.user_id WHERE sv.status='pending' ORDER BY sv.created_at ASC")->fetchAll(PDO::FETCH_ASSOC);
 $pendingStudents = $db->query("SELECT id, username, email, governorate, created_at FROM users WHERE is_student=0 AND is_student_verified=0 AND email LIKE '%@%' ORDER BY created_at ASC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
 $studentDomains  = $db->query("SELECT * FROM student_domains ORDER BY label")->fetchAll(PDO::FETCH_ASSOC);
@@ -172,6 +300,11 @@ $orgs           = $db->query("SELECT * FROM organizations ORDER BY created_at DE
 $hdConvs        = $db->query("SELECT hc.*, u.username AS user_name, a.username AS agent_name, (SELECT COUNT(*) FROM helpdesk_messages hm WHERE hm.conv_id=hc.id AND hm.is_read=0 AND hm.sender_type='user') AS unread FROM helpdesk_conversations hc JOIN users u ON u.id=hc.user_id LEFT JOIN users a ON a.id=hc.agent_id ORDER BY hc.updated_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
 $agents         = $db->query("SELECT id, username FROM users WHERE is_helpdesk_agent=1 ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
 $recentActivity = $db->query("SELECT bk.*, r.from_location, r.to_location, p.username AS passenger, dr.username AS driver FROM bookings bk JOIN rides r ON r.id=bk.ride_id JOIN users p ON p.id=bk.passenger_id JOIN users dr ON dr.id=r.driver_id ORDER BY bk.created_at DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
+
+// ── Admin tools data (§2.4) ──────────────────────────────────────────────────
+$announcements = $announce->recent(50);
+$promos        = $promo->all();
+$auditLogs     = $audit->recent(150);
 
 $pageTitle = 'Admin Console';
 ?>
@@ -301,25 +434,30 @@ body { background:#f0f4f8; margin:0; }
     <div class="badge-admin"><i class="fas fa-shield-alt me-1"></i>Admin Console</div>
   </div>
   <div class="nav-section">Dashboard</div>
-  <a href="?tab=overview"      class="<?= $tab==='overview'?'active':'' ?>"><i class="fas fa-tachometer-alt"></i> Overview</a>
-  <a href="?tab=activity"      class="<?= $tab==='activity'?'active':'' ?>"><i class="fas fa-stream"></i> Activity</a>
-  <div class="nav-section">People</div>
-  <a href="?tab=users"         class="<?= $tab==='users'?'active':'' ?>"><i class="fas fa-users"></i> Users
+  <a href="?tab=overview"        class="<?= $tab==='overview'?'active':'' ?>"><i class="fas fa-tachometer-alt"></i> Overview</a>
+  <a href="?tab=activity"        class="<?= $tab==='activity'?'active':'' ?>"><i class="fas fa-stream"></i> Activity</a>
+
+  <div class="nav-section">Accounts</div>
+  <a href="?tab=users"           class="<?= $tab==='users'?'active':'' ?>"><i class="fas fa-users"></i> Users
     <span class="nav-badge"><?= $stats['users'] ?></span></a>
-  <a href="?tab=verifications" class="<?= $tab==='verifications'?'active':'' ?>"><i class="fas fa-id-card"></i> Verifications
-    <?php if ($stats['pending_ver']): ?><span class="nav-badge"><?= $stats['pending_ver'] ?></span><?php endif; ?></a>
-  <a href="?tab=student_queue" class="<?= $tab==='student_queue'?'active':'' ?>"><i class="fas fa-user-graduate"></i> Students
-    <?php if ($stats['pending_student']): ?><span class="nav-badge"><?= $stats['pending_student'] ?></span><?php endif; ?></a>
+  <a href="?tab=organizations"   class="<?= $tab==='organizations'?'active':'' ?>"><i class="fas fa-building"></i> Organizations
+    <?php if ($stats['pending_org']): ?><span class="nav-badge"><?= $stats['pending_org'] ?></span><?php endif; ?></a>
+  <a href="?tab=verifications"   class="<?= $tab==='verifications'?'active':'' ?>"><i class="fas fa-id-card"></i> Verifications
+    <?php if ($stats['pending_total']): ?><span class="nav-badge"><?= $stats['pending_total'] ?></span><?php endif; ?></a>
   <a href="?tab=student_domains" class="<?= $tab==='student_domains'?'active':'' ?>"><i class="fas fa-at"></i> Student Domains
     <span class="nav-badge"><?= $stats['student_domains'] ?></span></a>
-  <a href="?tab=vehicle_queue" class="<?= $tab==='vehicle_queue'?'active':'' ?>"><i class="fas fa-car"></i> Vehicles
-    <?php if ($stats['pending_vehicle']): ?><span class="nav-badge"><?= $stats['pending_vehicle'] ?></span><?php endif; ?></a>
+
   <div class="nav-section">Operations</div>
-  <a href="?tab=complaints"    class="<?= $tab==='complaints'?'active':'' ?>"><i class="fas fa-flag"></i> Complaints
+  <a href="?tab=vehicles"        class="<?= $tab==='vehicles'?'active':'' ?>"><i class="fas fa-car"></i> Vehicles
+    <span class="nav-badge"><?= $stats['vehicles_total'] ?></span></a>
+  <a href="?tab=complaints"      class="<?= $tab==='complaints'?'active':'' ?>"><i class="fas fa-flag"></i> Complaints
     <?php if ($stats['complaints']): ?><span class="nav-badge"><?= $stats['complaints'] ?></span><?php endif; ?></a>
-  <a href="?tab=organizations" class="<?= $tab==='organizations'?'active':'' ?>"><i class="fas fa-building"></i> Organizations
-    <?php if ($stats['orgs']): ?><span class="nav-badge"><?= $stats['orgs'] ?></span><?php endif; ?></a>
-  <a href="?tab=helpdesk"      class="<?= $tab==='helpdesk'?'active':'' ?>"><i class="fas fa-headset"></i> HelpDesk</a>
+  <a href="?tab=helpdesk"        class="<?= $tab==='helpdesk'?'active':'' ?>"><i class="fas fa-headset"></i> HelpDesk</a>
+
+  <div class="nav-section">System</div>
+  <a href="?tab=announcements"   class="<?= $tab==='announcements'?'active':'' ?>"><i class="fas fa-bullhorn"></i> Announcements</a>
+  <a href="?tab=promos"          class="<?= $tab==='promos'?'active':'' ?>"><i class="fas fa-tags"></i> Promo Codes</a>
+  <a href="?tab=audit"           class="<?= $tab==='audit'?'active':'' ?>"><i class="fas fa-clipboard-list"></i> Audit Log</a>
   <div class="nav-footer">
     <a href="interface.php"><i class="fas fa-home"></i> Main Site</a>
     <a href="../index.php" style="color:rgba(239,68,68,.7)"><i class="fas fa-sign-out-alt"></i> Logout</a>
@@ -342,6 +480,9 @@ body { background:#f0f4f8; margin:0; }
         'complaints'    => '<i class="fas fa-flag me-2 text-primary"></i>Complaints',
         'organizations' => '<i class="fas fa-building me-2 text-primary"></i>Organizations',
         'helpdesk'      => '<i class="fas fa-headset me-2 text-primary"></i>HelpDesk Console',
+        'announcements' => '<i class="fas fa-bullhorn me-2 text-primary"></i>Broadcast Announcements',
+        'promos'        => '<i class="fas fa-tags me-2 text-primary"></i>Promo Codes',
+        'audit'         => '<i class="fas fa-clipboard-list me-2 text-primary"></i>Audit Log',
         'activity'      => '<i class="fas fa-stream me-2 text-primary"></i>Activity Feed',
         'student_queue'    => '<i class="fas fa-user-graduate me-2 text-warning"></i>Student Verification Queue',
         'student_domains'  => '<i class="fas fa-at me-2 text-success"></i>Student Email Domains',
@@ -440,6 +581,28 @@ body { background:#f0f4f8; margin:0; }
 
   <?php /* ═══ USERS ═══════════════════════════════════════════════════════ */ elseif ($tab === 'users'): ?>
   <div class="fd-card">
+    <!-- Role filter chips -->
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <?php
+      $chips = [
+        'all'     => ['All',     'fa-users'],
+        'driver'  => ['Drivers', 'fa-car'],
+        'student' => ['Students','fa-user-graduate'],
+        'agent'   => ['Agents',  'fa-headset'],
+        'admin'   => ['Admins',  'fa-shield-alt'],
+      ];
+      foreach ($chips as $key => [$label, $icon]):
+        $active = $role === $key;
+      ?>
+        <a href="?tab=users&role=<?= $key ?>"
+           class="btn btn-sm <?= $active ? 'btn-dark' : 'btn-outline-secondary' ?>"
+           style="border-radius:20px">
+          <i class="fas <?= $icon ?> me-1"></i><?= $label ?>
+          <span class="badge ms-1 <?= $active ? 'bg-light text-dark' : 'bg-secondary' ?>"><?= $roleCounts[$key] ?></span>
+        </a>
+      <?php endforeach; ?>
+    </div>
+
     <div class="mb-3">
       <input class="form-control" id="userSearch" placeholder="Search name or email…" style="max-width:320px">
     </div>
@@ -463,23 +626,37 @@ body { background:#f0f4f8; margin:0; }
             </td>
             <td class="text-muted small"><?= htmlspecialchars($u['email']) ?></td>
             <td>
+              <?php if ($u['is_admin']): ?><span class="badge bg-dark me-1">Admin</span><?php endif; ?>
               <?php if ($u['is_driver']): ?><span class="badge bg-primary me-1">Driver</span><?php endif; ?>
               <?php if ($u['is_student']): ?><span class="badge bg-info text-dark me-1">Student</span><?php endif; ?>
               <?php if ($u['is_helpdesk_agent']): ?><span class="badge bg-success me-1">Agent</span><?php endif; ?>
-              <?php if ($u['suspended']): ?><span class="badge bg-danger">Banned</span><?php endif; ?>
+              <?php
+                $wc = (int)($u['warnings_count'] ?? 0);
+                if ($wc > 0): ?>
+                  <span class="badge bg-warning text-dark me-1" title="Warnings issued"><i class="fas fa-exclamation-triangle me-1"></i><?= $wc ?></span>
+                <?php endif;
+                if ($u['suspended']):
+                  if (empty($u['suspended_until'])): ?>
+                    <span class="badge bg-danger"><i class="fas fa-ban me-1"></i>Banned</span>
+                  <?php elseif ($u['suspended_until'] > gmdate('Y-m-d H:i:s')): ?>
+                    <span class="badge bg-danger" title="Until <?= htmlspecialchars($u['suspended_until']) ?> UTC"><i class="fas fa-clock me-1"></i>Suspended</span>
+                  <?php else: ?>
+                    <span class="badge bg-secondary" title="Elapsed — lifts on next login">Suspension ended</span>
+                  <?php endif;
+                endif; ?>
             </td>
             <td><?= $u['total_trips'] ?? 0 ?></td>
             <td><span class="stars">★</span> <?= number_format($u['avg_rating'] ?? ($u['score'] ?? 5), 1) ?></td>
             <td class="text-muted small"><?= date('d M Y', strtotime($u['created_at'])) ?></td>
             <td class="text-end">
               <div class="d-flex justify-content-end gap-1 flex-wrap">
-                <?php if (!$u['suspended']): ?>
-                <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#banModal<?= $u['id'] ?>">
-                  <i class="fas fa-ban"></i>
+                <button class="btn btn-outline-danger btn-sm" title="Manage sanctions"
+                        data-bs-toggle="modal" data-bs-target="#sanctionModal<?= $u['id'] ?>">
+                  <i class="fas fa-gavel"></i>
                 </button>
-                <?php else: ?>
-                <form method="POST" class="d-inline">
-                  <input type="hidden" name="action" value="unban_user">
+                <?php if ($u['suspended']): ?>
+                <form method="POST" class="d-inline" title="Lift sanction now">
+                  <input type="hidden" name="action" value="lift_user">
                   <input type="hidden" name="target_id" value="<?= $u['id'] ?>">
                   <button class="btn btn-success btn-sm"><i class="fas fa-check"></i></button>
                 </form>
@@ -508,26 +685,107 @@ body { background:#f0f4f8; margin:0; }
                 <?php endif; ?>
               </div>
 
-              <!-- Ban modal -->
-              <div class="modal fade" id="banModal<?= $u['id'] ?>" tabindex="-1">
-                <div class="modal-dialog modal-dialog-centered">
+              <!-- Progressive sanctions modal (§2.4) -->
+              <?php
+                $u['_sanction_counts'] = $sanctionCounts[$u['id']] ?? [];
+                $suggest = Sanctions::suggestNext($u);
+                $history = $sanctionsByUser[$u['id']] ?? [];
+                $sLabels = [
+                  'warning'    => ['Warning',    'warning text-dark', 'exclamation-triangle'],
+                  'suspension' => ['Suspension', 'danger',            'clock'],
+                  'ban'        => ['Ban',        'dark',              'ban'],
+                  'lift'       => ['Lifted',     'success',           'check'],
+                ];
+              ?>
+              <div class="modal fade text-start" id="sanctionModal<?= $u['id'] ?>" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
                   <div class="modal-content">
-                    <div class="modal-header bg-danger text-white">
-                      <h5 class="modal-title">Suspend <?= htmlspecialchars($u['username']) ?></h5>
+                    <div class="modal-header" style="background:#0a1628;color:#fff">
+                      <h5 class="modal-title"><i class="fas fa-gavel me-2"></i>Sanctions — <?= htmlspecialchars($u['username']) ?></h5>
                       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
-                    <form method="POST">
-                      <div class="modal-body">
-                        <input type="hidden" name="action" value="ban_user">
+                    <div class="modal-body">
+                      <!-- Current state + suggested next step -->
+                      <div class="d-flex flex-wrap gap-4 align-items-center mb-3 p-2 rounded" style="background:#f8fafc">
+                        <div><span class="text-muted small d-block">Warnings</span><strong><?= (int)($u['warnings_count'] ?? 0) ?></strong></div>
+                        <div><span class="text-muted small d-block">Status</span>
+                          <?php if (!$u['suspended']): ?><span class="badge bg-success">Active</span>
+                          <?php elseif (empty($u['suspended_until'])): ?><span class="badge bg-danger">Banned</span>
+                          <?php else: ?><span class="badge bg-danger">Suspended until <?= htmlspecialchars($u['suspended_until']) ?> UTC</span><?php endif; ?>
+                        </div>
+                        <div class="ms-auto text-end"><span class="text-muted small d-block">Suggested next step</span>
+                          <span class="badge bg-info text-dark text-uppercase"><?= htmlspecialchars($suggest) ?></span></div>
+                      </div>
+
+                      <div class="row g-3">
+                        <!-- Warning -->
+                        <div class="col-md-4">
+                          <form method="POST" class="border rounded p-3 h-100 <?= $suggest==='warning'?'border-warning border-2':'' ?>">
+                            <input type="hidden" name="action" value="warn_user">
+                            <input type="hidden" name="target_id" value="<?= $u['id'] ?>">
+                            <div class="fw-bold mb-2 text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Warning</div>
+                            <textarea name="reason" class="form-control form-control-sm mb-2" rows="2" placeholder="Reason (optional)"></textarea>
+                            <button class="btn btn-warning btn-sm w-100">Issue warning</button>
+                          </form>
+                        </div>
+                        <!-- Suspension -->
+                        <div class="col-md-4">
+                          <form method="POST" class="border rounded p-3 h-100 <?= $suggest==='suspension'?'border-danger border-2':'' ?>"
+                                onsubmit="return confirm('Suspend this user?')">
+                            <input type="hidden" name="action" value="suspend_user">
+                            <input type="hidden" name="target_id" value="<?= $u['id'] ?>">
+                            <div class="fw-bold mb-2 text-danger"><i class="fas fa-clock me-1"></i>Suspension</div>
+                            <select name="days" class="form-select form-select-sm mb-2">
+                              <option value="7">7 days</option>
+                              <option value="14">14 days</option>
+                              <option value="30">30 days</option>
+                            </select>
+                            <textarea name="reason" class="form-control form-control-sm mb-2" rows="2" placeholder="Reason (optional)"></textarea>
+                            <button class="btn btn-danger btn-sm w-100">Suspend (7–30 days)</button>
+                          </form>
+                        </div>
+                        <!-- Ban -->
+                        <div class="col-md-4">
+                          <form method="POST" class="border rounded p-3 h-100 <?= $suggest==='ban'?'border-dark border-2':'' ?>"
+                                onsubmit="return confirm('Permanently ban this user? This blocks all login.')">
+                            <input type="hidden" name="action" value="ban_user">
+                            <input type="hidden" name="target_id" value="<?= $u['id'] ?>">
+                            <div class="fw-bold mb-2"><i class="fas fa-ban me-1"></i>Ban</div>
+                            <textarea name="reason" class="form-control form-control-sm mb-2" rows="2" placeholder="Reason (optional)"></textarea>
+                            <button class="btn btn-dark btn-sm w-100">Ban permanently</button>
+                          </form>
+                        </div>
+                      </div>
+
+                      <?php if ($u['suspended']): ?>
+                      <form method="POST" class="mt-3">
+                        <input type="hidden" name="action" value="lift_user">
                         <input type="hidden" name="target_id" value="<?= $u['id'] ?>">
-                        <label class="fd-form-label">Reason for suspension *</label>
-                        <textarea name="ban_reason" class="form-control" rows="3" required placeholder="Explain the reason…"></textarea>
-                      </div>
-                      <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger">Confirm Suspension</button>
-                      </div>
-                    </form>
+                        <button class="btn btn-outline-success btn-sm"><i class="fas fa-undo me-1"></i>Lift sanction &amp; reinstate</button>
+                      </form>
+                      <?php endif; ?>
+
+                      <!-- History -->
+                      <hr>
+                      <div class="fw-bold small text-uppercase text-muted mb-2"><i class="fas fa-history me-1"></i>Sanction history</div>
+                      <?php if (empty($history)): ?>
+                        <p class="text-muted small mb-0">No prior sanctions on record.</p>
+                      <?php else: ?>
+                      <ul class="list-unstyled small mb-0">
+                        <?php foreach ($history as $h): [$hl, $hc, $hi] = $sLabels[$h['type']] ?? [$h['type'], 'secondary', 'circle']; ?>
+                        <li class="d-flex gap-2 align-items-start mb-2">
+                          <span class="badge bg-<?= $hc ?>" style="white-space:nowrap"><i class="fas fa-<?= $hi ?> me-1"></i><?= $hl ?><?= $h['days'] ? ' '.(int)$h['days'].'d' : '' ?></span>
+                          <span>
+                            <?= htmlspecialchars($h['reason'] ?? '') ?>
+                            <span class="text-muted d-block" style="font-size:.7rem">
+                              <?= date('d M Y, H:i', strtotime($h['created_at'])) ?><?= $h['admin_name'] ? ' · by '.htmlspecialchars($h['admin_name']) : '' ?>
+                            </span>
+                          </span>
+                        </li>
+                        <?php endforeach; ?>
+                      </ul>
+                      <?php endif; ?>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -539,76 +797,224 @@ body { background:#f0f4f8; margin:0; }
     </div>
   </div>
 
-  <?php /* ═══ VERIFICATIONS ═══════════════════════════════════════════════ */ elseif ($tab === 'verifications'): ?>
-  <?php if (empty($verifications)): ?>
-    <div class="empty-state"><i class="fas fa-id-card"></i><p>No pending verifications</p></div>
-  <?php else: ?>
-    <?php foreach ($verifications as $v): ?>
-    <div class="fd-card mb-3">
-      <div class="d-flex justify-content-between flex-wrap gap-3">
-        <div>
-          <div class="fw-bold fs-6"><?= htmlspecialchars($v['username']) ?></div>
-          <div class="text-muted small"><?= htmlspecialchars($v['email']) ?></div>
-          <?php if ($v['governorate']): ?><div class="text-muted small"><i class="fas fa-map-marker-alt me-1"></i><?= htmlspecialchars($v['governorate']) ?></div><?php endif; ?>
-          <div class="text-muted small mt-1"><i class="fas fa-clock me-1"></i>Submitted <?= date('d M Y', strtotime($v['created_at'])) ?></div>
-        </div>
-        <div class="d-flex gap-2 align-items-start flex-wrap">
-          <form method="POST">
-            <input type="hidden" name="action" value="approve_verification">
-            <input type="hidden" name="target_id" value="<?= $v['id'] ?>">
-            <button class="btn-fd-success btn btn-sm"><i class="fas fa-check me-1"></i>Approve</button>
-          </form>
-          <form method="POST" class="d-flex gap-1 align-items-start">
-            <input type="hidden" name="action" value="reject_verification">
-            <input type="hidden" name="target_id" value="<?= $v['id'] ?>">
-            <input type="text" name="admin_note" class="form-control form-control-sm" placeholder="Reason…" style="width:160px">
-            <button class="btn-fd-danger btn btn-sm"><i class="fas fa-times me-1"></i>Reject</button>
-          </form>
-        </div>
-      </div>
-    </div>
+  <?php /* ═══ VERIFICATIONS (tabbed) ══════════════════════════════════════ */ elseif ($tab === 'verifications'): ?>
+  <!-- Sub-tab bar -->
+  <ul class="nav nav-pills mb-3 flex-wrap gap-1">
+    <?php
+    $verTabs = [
+      'students'      => ['Students',      'fa-user-graduate', (int)$stats['pending_ver'] + (int)$stats['pending_student']],
+      'vehicles'      => ['Vehicles',      'fa-car',           (int)$stats['pending_vehicle']],
+      'drivers'       => ['Drivers',       'fa-id-card',       0],
+      'organizations' => ['Organizations', 'fa-building',      (int)$stats['pending_org']],
+    ];
+    foreach ($verTabs as $key => [$label, $icon, $count]):
+      $active = $verifyType === $key;
+    ?>
+      <li class="nav-item">
+        <a class="nav-link <?= $active ? 'active' : '' ?>" href="?tab=verifications&type=<?= $key ?>">
+          <i class="fas <?= $icon ?> me-1"></i><?= $label ?>
+          <?php if ($count > 0): ?><span class="badge bg-danger ms-1"><?= $count ?></span><?php endif; ?>
+        </a>
+      </li>
     <?php endforeach; ?>
-  <?php endif; ?>
+  </ul>
 
-  <?php /* ═══ STUDENT QUEUE ═════════════════════════════════════════════ */ elseif ($tab === 'student_queue'): ?>
-  <div class="fd-card mb-3 p-3" style="background:#fffbeb;border-left:4px solid #f59e0b">
-    <div class="fw-semibold mb-1"><i class="fas fa-info-circle me-2 text-warning"></i>Student Verification Queue</div>
-    <div class="small text-muted">These users submitted an institutional email for the 50% student discount. Verify that the email domain is a real Tunisian university (e.g. <code>.edu.tn</code>, <code>.rnu.tn</code>, <code>.utm.tn</code>, etc.).</div>
-  </div>
-  <?php if (empty($pendingStudents)): ?>
-    <div class="empty-state"><i class="fas fa-user-graduate"></i><p>No pending student verifications</p></div>
-  <?php else: ?>
-    <?php foreach ($pendingStudents as $s): ?>
-    <div class="fd-card mb-3">
-      <div class="d-flex justify-content-between flex-wrap gap-3">
-        <div>
-          <div class="fw-bold"><?= htmlspecialchars($s['username']) ?></div>
-          <div class="text-muted small"><?= htmlspecialchars($s['email']) ?></div>
-          <?php if ($s['governorate']): ?>
-          <div class="text-muted small"><i class="fas fa-map-marker-alt me-1"></i><?= htmlspecialchars($s['governorate']) ?></div>
-          <?php endif; ?>
-          <div class="mt-2">
-            <span class="badge bg-primary" style="font-size:.8rem"><i class="fas fa-graduation-cap me-1"></i>Submitted email:</span>
-            <code class="ms-2"><?= htmlspecialchars($s['student_email'] ?? '—') ?></code>
+  <?php /* ─── Students sub-tab ─── */ if ($verifyType === 'students'): ?>
+    <!-- File-upload queue -->
+    <h6 class="text-muted small text-uppercase fw-bold mt-3 mb-2"><i class="fas fa-file-image me-1"></i>Card Upload Queue</h6>
+    <?php if (empty($verifications)): ?>
+      <div class="fd-card p-3 text-center text-muted small">No card uploads awaiting review.</div>
+    <?php else: ?>
+      <?php foreach ($verifications as $v): ?>
+      <div class="fd-card mb-3">
+        <div class="d-flex justify-content-between flex-wrap gap-3">
+          <div>
+            <div class="fw-bold fs-6"><?= htmlspecialchars($v['username']) ?></div>
+            <div class="text-muted small"><?= htmlspecialchars($v['email']) ?></div>
+            <?php if ($v['governorate']): ?><div class="text-muted small"><i class="fas fa-map-marker-alt me-1"></i><?= htmlspecialchars($v['governorate']) ?></div><?php endif; ?>
+            <div class="text-muted small mt-1"><i class="fas fa-clock me-1"></i>Submitted <?= date('d M Y', strtotime($v['created_at'])) ?></div>
+          </div>
+          <div class="d-flex gap-2 align-items-start flex-wrap">
+            <form method="POST">
+              <input type="hidden" name="action" value="approve_verification">
+              <input type="hidden" name="target_id" value="<?= $v['id'] ?>">
+              <button class="btn-fd-success btn btn-sm"><i class="fas fa-check me-1"></i>Approve</button>
+            </form>
+            <form method="POST" class="d-flex gap-1 align-items-start">
+              <input type="hidden" name="action" value="reject_verification">
+              <input type="hidden" name="target_id" value="<?= $v['id'] ?>">
+              <input type="text" name="admin_note" class="form-control form-control-sm" placeholder="Reason…" style="width:160px">
+              <button class="btn-fd-danger btn btn-sm"><i class="fas fa-times me-1"></i>Reject</button>
+            </form>
           </div>
         </div>
-        <div class="d-flex gap-2 align-items-start flex-wrap">
-          <form method="POST">
-            <input type="hidden" name="action" value="approve_student">
-            <input type="hidden" name="target_id" value="<?= $s['id'] ?>">
-            <button class="btn-fd-success btn btn-sm"><i class="fas fa-check me-1"></i>Approve</button>
-          </form>
-          <form method="POST" class="d-flex gap-1 align-items-start">
-            <input type="hidden" name="action" value="reject_student">
-            <input type="hidden" name="target_id" value="<?= $s['id'] ?>">
-            <input type="text" name="admin_note" class="form-control form-control-sm" placeholder="Reason…" style="width:180px">
-            <button class="btn-fd-danger btn btn-sm"><i class="fas fa-times me-1"></i>Reject</button>
-          </form>
+      </div>
+      <?php endforeach; ?>
+    <?php endif; ?>
+
+    <!-- Institutional-email queue -->
+    <h6 class="text-muted small text-uppercase fw-bold mt-4 mb-2"><i class="fas fa-graduation-cap me-1"></i>Institutional Email Queue</h6>
+    <?php if (empty($pendingStudents)): ?>
+      <div class="fd-card p-3 text-center text-muted small">No email-based student verifications pending.</div>
+    <?php else: ?>
+      <?php foreach ($pendingStudents as $s): ?>
+      <div class="fd-card mb-3">
+        <div class="d-flex justify-content-between flex-wrap gap-3">
+          <div>
+            <div class="fw-bold"><?= htmlspecialchars($s['username']) ?></div>
+            <div class="text-muted small"><?= htmlspecialchars($s['email']) ?></div>
+            <?php if ($s['governorate']): ?>
+            <div class="text-muted small"><i class="fas fa-map-marker-alt me-1"></i><?= htmlspecialchars($s['governorate']) ?></div>
+            <?php endif; ?>
+            <div class="mt-2">
+              <span class="badge bg-primary" style="font-size:.8rem"><i class="fas fa-graduation-cap me-1"></i>Submitted email:</span>
+              <code class="ms-2"><?= htmlspecialchars($s['student_email'] ?? '—') ?></code>
+            </div>
+          </div>
+          <div class="d-flex gap-2 align-items-start flex-wrap">
+            <form method="POST">
+              <input type="hidden" name="action" value="approve_student">
+              <input type="hidden" name="target_id" value="<?= $s['id'] ?>">
+              <button class="btn-fd-success btn btn-sm"><i class="fas fa-check me-1"></i>Approve</button>
+            </form>
+            <form method="POST" class="d-flex gap-1 align-items-start">
+              <input type="hidden" name="action" value="reject_student">
+              <input type="hidden" name="target_id" value="<?= $s['id'] ?>">
+              <input type="text" name="admin_note" class="form-control form-control-sm" placeholder="Reason…" style="width:180px">
+              <button class="btn-fd-danger btn btn-sm"><i class="fas fa-times me-1"></i>Reject</button>
+            </form>
+          </div>
         </div>
       </div>
+      <?php endforeach; ?>
+    <?php endif; ?>
+
+  <?php /* ─── Vehicles sub-tab ─── */ elseif ($verifyType === 'vehicles'): ?>
+    <div class="fd-card mb-3 p-3" style="background:#eff6ff;border-left:4px solid #3b82f6">
+      <div class="fw-semibold mb-1"><i class="fas fa-info-circle me-2 text-primary"></i>Vehicle Verification Queue</div>
+      <div class="small text-muted">These vehicles have a carte grise photo awaiting admin review. Check that the plate number matches the photo and the document is valid.</div>
     </div>
-    <?php endforeach; ?>
-  <?php endif; ?>
+    <?php if (empty($pendingVehicles)): ?>
+      <div class="empty-state"><i class="fas fa-car"></i><p>No vehicles awaiting verification</p></div>
+    <?php else: ?>
+      <?php foreach ($pendingVehicles as $v): ?>
+      <div class="fd-card mb-3">
+        <div class="d-flex justify-content-between flex-wrap gap-3">
+          <div class="flex-grow-1">
+            <div class="fw-bold"><?= htmlspecialchars($v['owner_name']) ?>
+              <span class="text-muted fw-normal small ms-2"><?= htmlspecialchars($v['owner_email']) ?></span>
+            </div>
+            <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+              <span class="badge bg-secondary"><?= htmlspecialchars(ucfirst($v['type'] ?? 'car')) ?></span>
+              <?php if ($v['make'] ?? ''): ?><span class="text-muted small"><?= htmlspecialchars($v['make']) ?> <?= htmlspecialchars($v['model'] ?? '') ?> <?= htmlspecialchars($v['year'] ?? '') ?></span><?php endif; ?>
+              <?php if ($v['plate_number'] ?? ''): ?>
+              <span class="badge bg-dark"><i class="fas fa-car-side me-1"></i><?= htmlspecialchars($v['plate_number']) ?></span>
+              <?php endif; ?>
+              <span class="badge bg-info text-dark"><?= $v['seats'] ?> seats</span>
+            </div>
+            <?php if ($v['id_card_photo'] ?? ''): ?>
+            <div class="mt-3">
+              <div class="fw-semibold small mb-1"><i class="fas fa-file-image me-1 text-primary"></i>Carte Grise Photo:</div>
+              <a href="../<?= htmlspecialchars($v['id_card_photo']) ?>" target="_blank">
+                <img src="../<?= htmlspecialchars($v['id_card_photo']) ?>"
+                     style="max-height:160px;max-width:340px;border-radius:8px;border:2px solid #e2e8f0;object-fit:contain"
+                     onerror="this.outerHTML='<span class=\'text-danger small\'>Photo not found</span>'"
+                     alt="Carte Grise">
+              </a>
+            </div>
+            <?php endif; ?>
+            <?php if ($v['photo'] ?? ''): ?>
+            <div class="mt-2">
+              <div class="fw-semibold small mb-1"><i class="fas fa-image me-1 text-success"></i>Vehicle Photo:</div>
+              <a href="../<?= htmlspecialchars($v['photo']) ?>" target="_blank">
+                <img src="../<?= htmlspecialchars($v['photo']) ?>"
+                     style="max-height:120px;max-width:240px;border-radius:8px;border:2px solid #e2e8f0;object-fit:cover"
+                     onerror="this.style.display='none'"
+                     alt="Vehicle">
+              </a>
+            </div>
+            <?php endif; ?>
+          </div>
+          <div class="d-flex flex-column gap-2 align-items-end">
+            <form method="POST">
+              <input type="hidden" name="action" value="approve_vehicle">
+              <input type="hidden" name="target_id" value="<?= $v['id'] ?>">
+              <button class="btn-fd-success btn btn-sm"><i class="fas fa-check me-1"></i>Verify Vehicle</button>
+            </form>
+            <form method="POST" class="d-flex gap-1 align-items-start">
+              <input type="hidden" name="action" value="reject_vehicle">
+              <input type="hidden" name="target_id" value="<?= $v['id'] ?>">
+              <input type="text" name="admin_note" class="form-control form-control-sm" placeholder="Reason…" style="width:180px">
+              <button class="btn-fd-danger btn btn-sm"><i class="fas fa-times me-1"></i>Reject</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    <?php endif; ?>
+
+  <?php /* ─── Drivers sub-tab (no flow exists yet) ─── */ elseif ($verifyType === 'drivers'): ?>
+    <div class="fd-card p-5 text-center">
+      <i class="fas fa-id-card-alt fa-3x text-muted mb-3"></i>
+      <h6 class="fw-bold">No driver verification queue yet</h6>
+      <p class="text-muted small mb-3">
+        Driver applications aren't separately reviewed in the current flow.<br>
+        To make a user a driver, use the <strong>Promote</strong> button in
+        <a href="?tab=users">Users</a>.
+      </p>
+      <a href="?tab=users" class="btn btn-outline-primary btn-sm">
+        <i class="fas fa-users me-1"></i>Go to Users
+      </a>
+    </div>
+
+  <?php /* ─── Organizations sub-tab (pending only) ─── */ elseif ($verifyType === 'organizations'): ?>
+    <div class="fd-card mb-3 p-3" style="background:#f0fdf4;border-left:4px solid #22c55e">
+      <div class="fw-semibold mb-1"><i class="fas fa-info-circle me-2 text-success"></i>Organization Applications</div>
+      <div class="small text-muted">Approving generates a unique discount code that the org can share with its members. The full directory of all organizations (active/suspended/pending) is under <a href="?tab=organizations">Accounts → Organizations</a>.</div>
+    </div>
+    <?php if (empty($pendingOrgs)): ?>
+      <div class="empty-state"><i class="fas fa-building"></i><p>No organization applications pending</p></div>
+    <?php else: ?>
+      <?php foreach ($pendingOrgs as $o): ?>
+      <div class="fd-card mb-3">
+        <div class="d-flex justify-content-between flex-wrap gap-3">
+          <div>
+            <div class="fw-bold fs-6"><?= htmlspecialchars($o['name']) ?>
+              <span class="badge bg-secondary ms-2"><?= htmlspecialchars(ucfirst($o['type'] ?? 'company')) ?></span>
+            </div>
+            <div class="text-muted small mt-1">
+              <i class="fas fa-user me-1"></i><?= htmlspecialchars($o['contact_name'] ?? $o['contact_person'] ?? '—') ?>
+              &nbsp;·&nbsp;
+              <i class="fas fa-envelope me-1"></i><?= htmlspecialchars($o['contact_email']) ?>
+            </div>
+            <?php if ($o['email_domain'] ?? $o['staff_email_domain'] ?? ''): ?>
+            <div class="text-muted small mt-1">
+              <i class="fas fa-at me-1"></i>@<?= htmlspecialchars($o['email_domain'] ?? $o['staff_email_domain']) ?>
+            </div>
+            <?php endif; ?>
+            <div class="text-muted small mt-1">
+              <i class="fas fa-percent me-1"></i>Requested discount: <strong><?= (int)$o['discount_percent'] ?>%</strong>
+              &nbsp;·&nbsp;
+              <i class="fas fa-clock me-1"></i>Submitted <?= date('d M Y', strtotime($o['created_at'])) ?>
+            </div>
+          </div>
+          <div class="d-flex gap-2 align-items-start flex-wrap">
+            <form method="POST">
+              <input type="hidden" name="action" value="approve_org">
+              <input type="hidden" name="target_id" value="<?= $o['id'] ?>">
+              <button class="btn-fd-success btn btn-sm"><i class="fas fa-check me-1"></i>Approve &amp; Generate Code</button>
+            </form>
+            <form method="POST">
+              <input type="hidden" name="action" value="reject_org">
+              <input type="hidden" name="target_id" value="<?= $o['id'] ?>">
+              <button class="btn-fd-danger btn btn-sm"><i class="fas fa-times me-1"></i>Reject</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    <?php endif; ?>
+  <?php endif; /* end verify sub-tabs */ ?>
 
   <?php /* ═══ STUDENT DOMAINS ════════════════════════════════════════════ */ elseif ($tab === 'student_domains'): ?>
   <div class="fd-card mb-3 p-3" style="background:#f0fdf4;border-left:4px solid #22c55e">
@@ -669,68 +1075,69 @@ body { background:#f0f4f8; margin:0; }
   </div>
   <?php endif; ?>
 
-  <?php /* ═══ VEHICLE QUEUE ══════════════════════════════════════════════ */ elseif ($tab === 'vehicle_queue'): ?>
+  <?php /* ═══ VEHICLES DIRECTORY ═════════════════════════════════════════ */ elseif ($tab === 'vehicles'): ?>
   <div class="fd-card mb-3 p-3" style="background:#eff6ff;border-left:4px solid #3b82f6">
-    <div class="fw-semibold mb-1"><i class="fas fa-info-circle me-2 text-primary"></i>Vehicle Verification Queue</div>
-    <div class="small text-muted">These vehicles have a carte grise photo awaiting admin review. Check that the plate number matches the photo and the document is valid.</div>
+    <div class="fw-semibold mb-1"><i class="fas fa-info-circle me-2 text-primary"></i>All Vehicles</div>
+    <div class="small text-muted">Read-only directory of every vehicle on the platform. Pending carte-grise approvals live under <a href="?tab=verifications&type=vehicles">Verifications → Vehicles</a>.</div>
   </div>
-  <?php if (empty($pendingVehicles)): ?>
-    <div class="empty-state"><i class="fas fa-car"></i><p>No vehicles awaiting verification</p></div>
+
+  <div class="mb-3">
+    <input class="form-control" id="vehicleSearch" placeholder="Search owner, plate, model…" style="max-width:340px">
+  </div>
+
+  <?php if (empty($allVehicles)): ?>
+    <div class="empty-state"><i class="fas fa-car"></i><p>No vehicles registered yet</p></div>
   <?php else: ?>
-    <?php foreach ($pendingVehicles as $v): ?>
-    <div class="fd-card mb-3">
-      <div class="d-flex justify-content-between flex-wrap gap-3">
-        <div class="flex-grow-1">
-          <div class="fw-bold"><?= htmlspecialchars($v['owner_name']) ?>
-            <span class="text-muted fw-normal small ms-2"><?= htmlspecialchars($v['owner_email']) ?></span>
-          </div>
-          <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
-            <span class="badge bg-secondary"><?= htmlspecialchars(ucfirst($v['type'] ?? 'car')) ?></span>
-            <?php if ($v['make'] ?? ''): ?><span class="text-muted small"><?= htmlspecialchars($v['make']) ?> <?= htmlspecialchars($v['model'] ?? '') ?> <?= htmlspecialchars($v['year'] ?? '') ?></span><?php endif; ?>
-            <?php if ($v['plate_number'] ?? ''): ?>
-            <span class="badge bg-dark"><i class="fas fa-car-side me-1"></i><?= htmlspecialchars($v['plate_number']) ?></span>
-            <?php endif; ?>
-            <span class="badge bg-info text-dark"><?= $v['seats'] ?> seats</span>
-          </div>
-          <?php if ($v['id_card_photo'] ?? ''): ?>
-          <div class="mt-3">
-            <div class="fw-semibold small mb-1"><i class="fas fa-file-image me-1 text-primary"></i>Carte Grise Photo:</div>
-            <a href="../<?= htmlspecialchars($v['id_card_photo']) ?>" target="_blank">
-              <img src="../<?= htmlspecialchars($v['id_card_photo']) ?>"
-                   style="max-height:160px;max-width:340px;border-radius:8px;border:2px solid #e2e8f0;object-fit:contain"
-                   onerror="this.outerHTML='<span class=\'text-danger small\'>Photo not found</span>'"
-                   alt="Carte Grise">
-            </a>
-          </div>
-          <?php endif; ?>
-          <?php if ($v['photo'] ?? ''): ?>
-          <div class="mt-2">
-            <div class="fw-semibold small mb-1"><i class="fas fa-image me-1 text-success"></i>Vehicle Photo:</div>
-            <a href="../<?= htmlspecialchars($v['photo']) ?>" target="_blank">
-              <img src="../<?= htmlspecialchars($v['photo']) ?>"
-                   style="max-height:120px;max-width:240px;border-radius:8px;border:2px solid #e2e8f0;object-fit:cover"
-                   onerror="this.style.display='none'"
-                   alt="Vehicle">
-            </a>
-          </div>
-          <?php endif; ?>
-        </div>
-        <div class="d-flex flex-column gap-2 align-items-end">
-          <form method="POST">
-            <input type="hidden" name="action" value="approve_vehicle">
-            <input type="hidden" name="target_id" value="<?= $v['id'] ?>">
-            <button class="btn-fd-success btn btn-sm"><i class="fas fa-check me-1"></i>Verify Vehicle</button>
-          </form>
-          <form method="POST" class="d-flex gap-1 align-items-start">
-            <input type="hidden" name="action" value="reject_vehicle">
-            <input type="hidden" name="target_id" value="<?= $v['id'] ?>">
-            <input type="text" name="admin_note" class="form-control form-control-sm" placeholder="Reason…" style="width:180px">
-            <button class="btn-fd-danger btn btn-sm"><i class="fas fa-times me-1"></i>Reject</button>
-          </form>
-        </div>
-      </div>
+  <div class="fd-card p-0 overflow-hidden">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle small mb-0" id="vehiclesTable">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Owner</th>
+            <th>Type</th>
+            <th>Vehicle</th>
+            <th>Plate</th>
+            <th>Seats</th>
+            <th>Status</th>
+            <th class="pe-3">Registered</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($allVehicles as $v): ?>
+          <tr>
+            <td class="ps-3">
+              <div class="fw-semibold"><?= htmlspecialchars($v['owner_name']) ?></div>
+              <div class="text-muted" style="font-size:.7rem"><?= htmlspecialchars($v['owner_email']) ?></div>
+            </td>
+            <td><span class="badge bg-secondary"><?= htmlspecialchars(ucfirst($v['type'] ?? 'car')) ?></span></td>
+            <td class="small">
+              <?= htmlspecialchars(trim(($v['make'] ?? '') . ' ' . ($v['model'] ?? ''))) ?: '<span class="text-muted">—</span>' ?>
+              <?php if (!empty($v['year'])): ?><span class="text-muted">· <?= (int)$v['year'] ?></span><?php endif; ?>
+            </td>
+            <td>
+              <?php if (!empty($v['plate_number'])): ?>
+                <code><?= htmlspecialchars($v['plate_number']) ?></code>
+              <?php else: ?>
+                <span class="text-muted">—</span>
+              <?php endif; ?>
+            </td>
+            <td><?= (int)($v['seats'] ?? 0) ?></td>
+            <td>
+              <?php if (!empty($v['verified'])): ?>
+                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Verified</span>
+              <?php elseif (!empty($v['id_card_photo'])): ?>
+                <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Pending</span>
+              <?php else: ?>
+                <span class="badge bg-secondary">Not submitted</span>
+              <?php endif; ?>
+            </td>
+            <td class="pe-3 text-muted small"><?= date('d M Y', strtotime($v['created_at'])) ?></td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
     </div>
-    <?php endforeach; ?>
+  </div>
   <?php endif; ?>
 
   <?php /* ═══ COMPLAINTS ══════════════════════════════════════════════════ */ elseif ($tab === 'complaints'): ?>
@@ -853,6 +1260,146 @@ body { background:#f0f4f8; margin:0; }
       </table>
     </div>
   <?php endif; ?>
+
+  <?php /* ═══ ANNOUNCEMENTS ═══════════════════════════════════════════════ */ elseif ($tab === 'announcements'): ?>
+  <div class="row g-3">
+    <div class="col-12 col-lg-5">
+      <div class="fd-card">
+        <div class="card-title"><i class="fas fa-bullhorn text-primary"></i> New Announcement</div>
+        <form method="POST" onsubmit="return confirm('Send this announcement to the selected audience?')">
+          <input type="hidden" name="action" value="broadcast_announcement">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Title <span class="text-danger">*</span></label>
+            <input type="text" name="title" class="form-control form-control-sm" maxlength="120" required placeholder="e.g. Scheduled maintenance Sunday">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Message <span class="text-danger">*</span></label>
+            <textarea name="body" class="form-control form-control-sm" rows="4" required placeholder="Write your announcement…"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Audience</label>
+            <select name="audience" class="form-select form-select-sm">
+              <option value="all">All users</option>
+              <option value="drivers">Drivers only</option>
+              <option value="students">Students only</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-sm w-100"><i class="fas fa-paper-plane me-1"></i>Send announcement</button>
+        </form>
+        <div class="form-text small mt-2">Recipients see it in their in-app notifications (web and mobile).</div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-7">
+      <div class="fd-card">
+        <div class="card-title"><i class="fas fa-history text-primary"></i> Sent Announcements</div>
+        <?php if (empty($announcements)): ?>
+          <p class="text-muted small mb-0">No announcements sent yet.</p>
+        <?php else: foreach ($announcements as $an): ?>
+          <div class="border-bottom py-2">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div class="fw-semibold"><?= htmlspecialchars($an['title']) ?></div>
+              <span class="badge bg-secondary flex-shrink-0"><?= htmlspecialchars(Announcement::audienceLabel($an['audience'])) ?></span>
+            </div>
+            <div class="small text-muted"><?= nl2br(htmlspecialchars($an['body'])) ?></div>
+            <div class="text-muted" style="font-size:.7rem">
+              <i class="fas fa-users me-1"></i><?= (int)$an['sent_count'] ?> recipient(s)
+              · <?= date('d M Y, H:i', strtotime($an['created_at'])) ?><?= $an['admin_name'] ? ' · by '.htmlspecialchars($an['admin_name']) : '' ?>
+            </div>
+          </div>
+        <?php endforeach; endif; ?>
+      </div>
+    </div>
+  </div>
+
+  <?php /* ═══ PROMO CODES ═════════════════════════════════════════════════ */ elseif ($tab === 'promos'): ?>
+  <div class="fd-card mb-4">
+    <div class="card-title"><i class="fas fa-tags text-primary"></i> Create Promo Code</div>
+    <form method="POST" class="row g-2 align-items-end">
+      <input type="hidden" name="action" value="create_promo">
+      <div class="col-sm-3">
+        <label class="form-label small fw-semibold">Code</label>
+        <input type="text" name="code" class="form-control form-control-sm" placeholder="(auto if blank)" style="text-transform:uppercase">
+      </div>
+      <div class="col-sm-2">
+        <label class="form-label small fw-semibold">Credit (TND) <span class="text-danger">*</span></label>
+        <input type="number" name="amount" step="0.5" min="0.5" max="1000" class="form-control form-control-sm" required>
+      </div>
+      <div class="col-sm-2">
+        <label class="form-label small fw-semibold">Max uses</label>
+        <input type="number" name="max_uses" min="0" value="0" class="form-control form-control-sm" title="0 = unlimited">
+      </div>
+      <div class="col-sm-3">
+        <label class="form-label small fw-semibold">Expires</label>
+        <input type="date" name="expires_at" class="form-control form-control-sm">
+      </div>
+      <div class="col-sm-2">
+        <button class="btn btn-success btn-sm w-100"><i class="fas fa-plus me-1"></i>Create</button>
+      </div>
+    </form>
+    <div class="form-text small mt-1">Blank code is auto-generated · max uses 0 = unlimited · blank expiry = never · each user can redeem a code once.</div>
+  </div>
+
+  <div class="fd-card p-0 overflow-hidden">
+    <table class="table table-hover mb-0 align-middle">
+      <thead style="background:#f8fafc"><tr>
+        <th class="ps-4">Code</th><th>Credit</th><th>Uses</th><th>Expires</th><th>Status</th><th class="text-end pe-4">Action</th>
+      </tr></thead>
+      <tbody>
+      <?php if (empty($promos)): ?>
+        <tr><td colspan="6" class="text-center text-muted small py-3">No promo codes yet.</td></tr>
+      <?php else: foreach ($promos as $p):
+        $expired  = !empty($p['expires_at']) && strtotime($p['expires_at']) <= time();
+        $maxedOut = (int)$p['max_uses'] > 0 && (int)$p['used_count'] >= (int)$p['max_uses'];
+        $live     = $p['is_active'] && !$expired && !$maxedOut;
+      ?>
+        <tr>
+          <td class="ps-4"><code><?= htmlspecialchars($p['code']) ?></code></td>
+          <td class="fw-semibold"><?= number_format($p['amount'],2) ?> TND</td>
+          <td><?= (int)$p['used_count'] ?><?= (int)$p['max_uses'] > 0 ? ' / '.(int)$p['max_uses'] : '' ?></td>
+          <td class="small text-muted"><?= !empty($p['expires_at']) ? date('d M Y', strtotime($p['expires_at'])) : '—' ?></td>
+          <td>
+            <?php if ($live): ?><span class="badge bg-success">Active</span>
+            <?php elseif (empty($p['is_active'])): ?><span class="badge bg-secondary">Disabled</span>
+            <?php elseif ($expired): ?><span class="badge bg-warning text-dark">Expired</span>
+            <?php else: ?><span class="badge bg-warning text-dark">Used up</span><?php endif; ?>
+          </td>
+          <td class="text-end pe-4">
+            <form method="POST" class="d-inline">
+              <input type="hidden" name="action" value="toggle_promo">
+              <input type="hidden" name="target_id" value="<?= $p['id'] ?>">
+              <input type="hidden" name="activate" value="<?= $p['is_active'] ? '' : '1' ?>">
+              <button class="btn btn-sm <?= $p['is_active'] ? 'btn-outline-secondary' : 'btn-outline-success' ?>">
+                <?= $p['is_active'] ? 'Deactivate' : 'Activate' ?>
+              </button>
+            </form>
+          </td>
+        </tr>
+      <?php endforeach; endif; ?>
+      </tbody>
+    </table>
+  </div>
+
+  <?php /* ═══ AUDIT LOG ═══════════════════════════════════════════════════ */ elseif ($tab === 'audit'): ?>
+  <div class="fd-card p-0 overflow-hidden">
+    <table class="table table-hover mb-0 align-middle small">
+      <thead style="background:#f8fafc"><tr>
+        <th class="ps-4">When</th><th>Admin</th><th>Action</th><th>Target</th><th>Details</th>
+      </tr></thead>
+      <tbody>
+      <?php if (empty($auditLogs)): ?>
+        <tr><td colspan="5" class="text-center text-muted py-3">No audit entries yet.</td></tr>
+      <?php else: foreach ($auditLogs as $log): ?>
+        <tr>
+          <td class="ps-4 text-muted" style="white-space:nowrap"><?= date('d M Y, H:i', strtotime($log['created_at'])) ?></td>
+          <td><?= htmlspecialchars($log['admin_name'] ?? '—') ?></td>
+          <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($log['action']) ?></span></td>
+          <td class="text-muted"><?= $log['target_id'] ? '#'.(int)$log['target_id'] : '—' ?></td>
+          <td><?= htmlspecialchars($log['summary'] ?? '') ?></td>
+        </tr>
+      <?php endforeach; endif; ?>
+      </tbody>
+    </table>
+  </div>
   <?php endif; ?>
 
 </main>
@@ -864,6 +1411,14 @@ const s = document.getElementById('userSearch');
 if (s) s.addEventListener('input', function() {
     const q = this.value.toLowerCase();
     document.querySelectorAll('#usersTable tbody tr').forEach(tr => {
+        tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+});
+
+const vs = document.getElementById('vehicleSearch');
+if (vs) vs.addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('#vehiclesTable tbody tr').forEach(tr => {
         tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
     });
 });

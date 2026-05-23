@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../classes/database.php';
+require_once __DIR__ . '/../classes/sanctions.php';
 
 // ── Database ──────────────────────────────────────────────────────────────────
 function db(): PDO {
@@ -69,8 +70,9 @@ function auth_user(): array {
     if (!$user) {
         json_error('Unauthorized', 401);
     }
-    if (!empty($user['suspended'])) {
-        json_error('Account suspended: ' . ($user['ban_reason'] ?? 'Contact support'), 403);
+    Sanctions::applyExpiry($pdo, $user);
+    if ($lockout = Sanctions::lockoutMessage($user)) {
+        json_error($lockout, 403);
     }
     return $user;
 }

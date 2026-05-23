@@ -17,8 +17,9 @@ switch ($method . ':' . $action) {
         if (!$user || !password_verify($b['password'], $user['password'])) {
             json_error('Invalid email or password', 401);
         }
-        if (!empty($user['suspended'])) {
-            json_error('Account suspended: ' . ($user['ban_reason'] ?? 'Contact support'), 403);
+        Sanctions::applyExpiry($pdo, $user);
+        if ($lockout = Sanctions::lockoutMessage($user)) {
+            json_error($lockout, 403);
         }
         if (!empty($user['is_admin'])) {
             json_error('Admin accounts can only access the web panel. Please use the website to log in.', 403);

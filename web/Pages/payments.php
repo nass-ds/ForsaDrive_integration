@@ -3,6 +3,7 @@ require_once '../server/session.php';
 require_once '../server/language.php';
 require_once '../classes/users.php';
 require_once '../classes/payments.php';
+require_once '../classes/promo_codes.php';
 
 requireRegularUser();
 
@@ -81,8 +82,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['redeem_referral'])) {
     }
 }
 
-if (isset($_GET['ok']))  { $msg = 'Funds added successfully!'; $msgType = 'success'; }
-if (isset($_GET['ref'])) { $msg = 'Referral code applied! You received 5 TND and your referrer got 10 TND.'; $msgType = 'success'; }
+// ── Promo code redemption ──────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['redeem_promo'])) {
+    $promoSvc = new PromoCodes($db);
+    [$pOk, $pMsg, $pAmt] = $promoSvc->redeem($uid, $_POST['promo_code'] ?? '');
+    if ($pOk) {
+        $_SESSION['user_data']['balance'] = $balance + $pAmt;
+        header('Location: payments.php?promo=' . urlencode($pMsg)); exit();
+    }
+    $msg = $pMsg; $msgType = 'danger';
+}
+
+if (isset($_GET['ok']))    { $msg = 'Funds added successfully!'; $msgType = 'success'; }
+if (isset($_GET['ref']))   { $msg = 'Referral code applied! You received 5 TND and your referrer got 10 TND.'; $msgType = 'success'; }
+if (isset($_GET['promo'])) { $msg = $_GET['promo']; $msgType = 'success'; }
 
 $history = $payments->getPaymentHistory($uid);
 
@@ -134,6 +147,18 @@ include '../include/sidebar.php';
           <button type="submit" name="add_funds" class="btn-fd-success btn w-100">
             <i class="fas fa-coins me-1"></i>Simulate Top-Up
           </button>
+        </form>
+      </div>
+
+      <!-- Promo code card -->
+      <div class="fd-card mb-3">
+        <div class="card-title"><i class="fas fa-tags text-primary"></i> Redeem a Promo Code</div>
+        <p class="text-muted small mb-2">Have a promo code? Redeem it to add credit to your wallet.</p>
+        <form method="POST">
+          <div class="input-group">
+            <input type="text" name="promo_code" class="form-control" placeholder="e.g. FD3A9C1F" maxlength="24" style="text-transform:uppercase;" required>
+            <button type="submit" name="redeem_promo" class="btn-fd-primary btn">Redeem</button>
+          </div>
         </form>
       </div>
 

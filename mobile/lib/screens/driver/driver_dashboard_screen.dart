@@ -8,6 +8,7 @@ import '../../services/api_service.dart';
 import '../../services/ride_service.dart';
 import '../../models/ride_model.dart';
 import '../../utils/app_theme.dart';
+import '../../widgets/boost_tier_picker.dart';
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 const _kNavy    = AppTheme.primary;
@@ -1256,43 +1257,22 @@ class _DriverRideCardState extends State<_DriverRideCard> {
   bool _arriving = false;
 
   Future<void> _boostRide() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _kCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(children: [
-          Icon(Icons.bolt, color: Colors.amber),
-          SizedBox(width: 8),
-          Text('Boost Ride', style: TextStyle(color: _kWhite, fontWeight: FontWeight.w800)),
-        ]),
-        content: Text(
-          'Boost "${widget.ride.fromLocation} → ${widget.ride.toLocation}" to the top of the community feed for 5 TND.\n\nThe fee is deducted from your wallet.',
-          style: const TextStyle(color: _kMuted, fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: _kMuted)),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black87,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            icon: const Icon(Icons.bolt, size: 16),
-            label: const Text('Boost for 5 TND', style: TextStyle(fontWeight: FontWeight.w700)),
-            onPressed: () => Navigator.pop(ctx, true),
-          ),
-        ],
-      ),
+    final tier = await showBoostTierPicker(
+      context,
+      title: 'Boost Ride',
+      subtitle:
+          'Pin "${widget.ride.fromLocation} → ${widget.ride.toLocation}" to the top of the community feed. Pick how long it stays featured — the fee is deducted from your wallet.',
+      backgroundColor: _kCard,
+      textColor: _kWhite,
+      subtitleColor: _kMuted,
     );
-    if (confirmed != true || !mounted) return;
+    if (tier == null || !mounted) return;
 
     setState(() => _boosting = true);
     try {
-      await context.read<ApiService>().post('/feed/boost-ride', {'ride_id': widget.ride.id});
+      await context
+          .read<ApiService>()
+          .post('/feed/boost-ride', {'ride_id': widget.ride.id, 'tier': tier});
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
