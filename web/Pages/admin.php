@@ -29,7 +29,15 @@ if ($tab === 'student_queue') {
     header('Location: admin.php?tab=verifications&type=students'); exit();
 }
 if ($tab === 'vehicle_queue') {
-    header('Location: admin.php?tab=verifications&type=vehicles'); exit();
+    header('Location: admin.php?tab=verifications&type=drivers'); exit();
+}
+if ($tab === 'student_domains') {
+    header('Location: admin.php?tab=verifications&type=domains'); exit();
+}
+// Vehicles no longer have a standalone destination — they're viewed through
+// their owner's user record. Old links land on the driver list.
+if ($tab === 'vehicles') {
+    header('Location: admin.php?tab=users&role=driver'); exit();
 }
 
 // ── Sub-filters used by the refactored tabs ──────────────────────────────────
@@ -37,7 +45,7 @@ $validRoles       = ['all', 'driver', 'student', 'agent', 'admin'];
 $roleParam        = $_GET['role'] ?? 'all';
 $role             = in_array($roleParam, $validRoles, true) ? $roleParam : 'all';
 
-$validVerifyTypes = ['students', 'vehicles', 'drivers', 'organizations'];
+$validVerifyTypes = ['students', 'drivers', 'organizations', 'domains'];
 $typeParam        = $_GET['type'] ?? 'students';
 $verifyType       = in_array($typeParam, $validVerifyTypes, true) ? $typeParam : 'students';
 
@@ -154,23 +162,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $notif->create($targetId, 'Student Verification Rejected', "Your student verification was rejected. Reason: $note. You may resubmit with a valid .edu.tn or .rnu.tn email.", 'danger');
             $msg = 'Student rejected.'; $msgType = 'danger'; $tab = 'student_queue'; break;
 
-        // Vehicle verification
+        // Driver review — one decision covering the driver's licence + vehicle.
+        // (A vehicle submission bundles permis de conduire, carte grise, etc.)
         case 'approve_vehicle':
-            $db->prepare("UPDATE vehicles SET verified=1, verified_at=datetime('now') WHERE id=?")->execute([$targetId]);
+            $db->prepare("UPDATE vehicles SET verified=1, verification_status='approved', rejection_note=NULL, verified_at=datetime('now') WHERE id=?")->execute([$targetId]);
             $vRow = $db->prepare("SELECT user_id FROM vehicles WHERE id=?"); $vRow->execute([$targetId]);
             if ($vOwner = $vRow->fetchColumn()) {
-                $notif->create($vOwner, 'Vehicle Verified ✅', 'Your vehicle has been verified. You can now offer rides!', 'success');
+                $notif->create($vOwner, 'Driver Verified ✅', 'Your licence and vehicle have been verified. You can now offer rides!', 'success');
             }
-            $msg = 'Vehicle verified.'; $msgType = 'success'; $tab = 'vehicle_queue'; break;
+            $msg = 'Driver review approved.'; $msgType = 'success'; $tab = 'verifications'; $redirectType = 'drivers'; break;
 
         case 'reject_vehicle':
             $note = trim($_POST['admin_note'] ?? 'Documents unclear.');
-            $db->prepare("UPDATE vehicles SET verified=0 WHERE id=?")->execute([$targetId]);
+            $db->prepare("UPDATE vehicles SET verified=0, verification_status='rejected', rejection_note=? WHERE id=?")->execute([$note, $targetId]);
             $vRow = $db->prepare("SELECT user_id FROM vehicles WHERE id=?"); $vRow->execute([$targetId]);
             if ($vOwner = $vRow->fetchColumn()) {
-                $notif->create($vOwner, 'Vehicle Verification Failed', "Your vehicle could not be verified. Reason: $note. Please upload a clearer photo of your carte grise.", 'danger');
+                $notif->create($vOwner, 'Driver Verification Failed', "Your driver review was rejected. Reason: $note. Please re-upload clear photos of your licence and carte grise.", 'danger');
             }
-            $msg = 'Vehicle rejected.'; $msgType = 'danger'; $tab = 'vehicle_queue'; break;
+            $msg = 'Driver review rejected.'; $msgType = 'danger'; $tab = 'verifications'; $redirectType = 'drivers'; break;
 
         // ── Broadcast announcements (§2.4) ────────────────────────────────────
         case 'broadcast_announcement':
@@ -208,12 +217,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audit->log($uid, $action, null, $targetId ?: null, trim(strip_tags($msg)) ?: null);
     }
 
-    header("Location: admin.php?tab=$tab&msg=" . urlencode($msg) . "&mt=$msgType"); exit();
+    // Carry the verifications sub-tab so the reviewer lands back where they acted
+    // (and the confirmation message survives, unlike the legacy-redirect hop).
+    $typeQS = ($tab === 'verifications' && isset($redirectType)) ? "&type=$redirectType" : '';
+    header("Location: admin.php?tab=$tab$typeQS&msg=" . urlencode($msg) . "&mt=$msgType"); exit();
 }
 
 if (isset($_GET['msg'])) { $msg = $_GET['msg']; $msgType = $_GET['mt'] ?? 'info'; }
 
 // ── Data ──────────────────────────────────────────────────────────────────────
+// A "driver review" is a vehicle submission still awaiting a decision: status
+// pending AND the driver actually uploaded at least one document to review.
+$driverReviewWhere = "v.verification_status='pending' AND ("
+    . "(v.carte_grise IS NOT NULL AND v.carte_grise != '') OR "
+    . "(v.permis_conduire IS NOT NULL AND v.permis_conduire != '') OR "
+    . "(v.id_card_photo IS NOT NULL AND v.id_card_photo != ''))";
+
 $stats = [
     'users'           => $db->query("SELECT COUNT(*) FROM users WHERE is_admin=0")->fetchColumn(),
     'drivers'         => $db->query("SELECT COUNT(*) FROM users WHERE is_driver=1 AND is_admin=0")->fetchColumn(),
@@ -223,7 +242,7 @@ $stats = [
     'pending_ver'     => $db->query("SELECT COUNT(*) FROM student_verifications WHERE status='pending'")->fetchColumn(),
     'pending_student' => $db->query("SELECT COUNT(*) FROM users WHERE student_status='pending'")->fetchColumn(),
     'student_domains' => $db->query("SELECT COUNT(*) FROM student_domains")->fetchColumn(),
-    'pending_vehicle' => $db->query("SELECT COUNT(*) FROM vehicles WHERE verified=0 AND id_card_photo IS NOT NULL AND id_card_photo != ''")->fetchColumn(),
+    'pending_vehicle' => $db->query("SELECT COUNT(*) FROM vehicles v WHERE $driverReviewWhere")->fetchColumn(),
     'pending_org'     => $db->query("SELECT COUNT(*) FROM organizations WHERE status='pending'")->fetchColumn(),
     'orgs'            => $db->query("SELECT COUNT(*) FROM organizations WHERE status='pending'")->fetchColumn(),
     'vehicles_total'  => $db->query("SELECT COUNT(*) FROM vehicles")->fetchColumn(),
@@ -280,21 +299,51 @@ $roleCounts = [
     'admin'   => (int)$db->query("SELECT COUNT(*) FROM users WHERE is_admin=1")->fetchColumn(),
 ];
 
-// ── All vehicles directory (for the new OPERATIONS > Vehicles page) ──────────
-$allVehicles = $db->query("
-    SELECT v.*, u.username AS owner_name, u.email AS owner_email
-    FROM vehicles v
-    JOIN users u ON u.id = v.user_id
-    ORDER BY v.created_at DESC
-    LIMIT 200
-")->fetchAll(PDO::FETCH_ASSOC);
+// ── User detail page (?tab=user&id=X) ───────────────────────────────────────
+// A vehicle is always viewed through its owner, so the detail page loads the
+// user, their driver profile and the vehicle that carries the driver's docs.
+$detailUser = $detailDriver = null;
+$detailVehicles = [];
+if ($tab === 'user') {
+    $detailId = (int)($_GET['id'] ?? 0);
+    $stmt = $db->prepare("SELECT u.*, dp.avg_rating, dp.total_trips, dp.license_number
+                          FROM users u
+                          LEFT JOIN driver_profiles dp ON dp.user_id = u.id
+                          WHERE u.id = ?");
+    $stmt->execute([$detailId]);
+    $detailUser = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    if ($detailUser) {
+        $detailDriver = ($detailUser['is_driver'] || $detailUser['license_number'] !== null
+                         || $detailUser['avg_rating'] !== null);
+        $vs = $db->prepare("SELECT * FROM vehicles WHERE user_id = ? ORDER BY created_at DESC");
+        $vs->execute([$detailId]);
+        $detailVehicles = $vs->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+// Uploaded docs live in web/Src/ (served via the /ForsaDrive/Src/ Apache alias).
+// Stored values may be a bare filename or a path — normalise to ../Src/<basename>.
+$docUrl = function (?string $v): ?string {
+    if ($v === null || trim($v) === '') return null;
+    $v = trim($v);
+    if (preg_match('~^https?://~i', $v)) return $v;
+    return '../Src/' . rawurlencode(basename(str_replace('\\', '/', $v)));
+};
+// Shared "driver review" status badge (one decision covers licence + vehicle).
+$statusBadge = function (?string $s): string {
+    return match ($s) {
+        'approved' => '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Approved</span>',
+        'rejected' => '<span class="badge bg-danger"><i class="fas fa-times-circle me-1"></i>Rejected</span>',
+        default    => '<span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Pending review</span>',
+    };
+};
 
 // ── Pending organizations only (for Verifications > Organizations sub-tab) ───
 $pendingOrgs = $db->query("SELECT * FROM organizations WHERE status='pending' ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 $verifications  = $db->query("SELECT sv.*, u.username, u.email, u.governorate FROM student_verifications sv JOIN users u ON u.id=sv.user_id WHERE sv.status='pending' ORDER BY sv.created_at ASC")->fetchAll(PDO::FETCH_ASSOC);
 $pendingStudents = $db->query("SELECT id, username, email, governorate, created_at FROM users WHERE is_student=0 AND is_student_verified=0 AND email LIKE '%@%' ORDER BY created_at ASC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
 $studentDomains  = $db->query("SELECT * FROM student_domains ORDER BY label")->fetchAll(PDO::FETCH_ASSOC);
-$pendingVehicles = $db->query("SELECT v.*, u.username AS owner_name, u.email AS owner_email FROM vehicles v JOIN users u ON u.id=v.user_id WHERE v.verified=0 AND v.id_card_photo IS NOT NULL AND v.id_card_photo != '' ORDER BY v.created_at ASC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+$pendingDriverReviews = $db->query("SELECT v.*, u.id AS owner_id, u.username AS owner_name, u.email AS owner_email FROM vehicles v JOIN users u ON u.id=v.user_id WHERE $driverReviewWhere ORDER BY v.created_at ASC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
 $openComplaints = $comp->getAllComplaints('open');
 $orgs           = $db->query("SELECT * FROM organizations ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 $hdConvs        = $db->query("SELECT hc.*, u.username AS user_name, a.username AS agent_name, (SELECT COUNT(*) FROM helpdesk_messages hm WHERE hm.conv_id=hc.id AND hm.is_read=0 AND hm.sender_type='user') AS unread FROM helpdesk_conversations hc JOIN users u ON u.id=hc.user_id LEFT JOIN users a ON a.id=hc.agent_id ORDER BY hc.updated_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
@@ -444,12 +493,8 @@ body { background:#f0f4f8; margin:0; }
     <?php if ($stats['pending_org']): ?><span class="nav-badge"><?= $stats['pending_org'] ?></span><?php endif; ?></a>
   <a href="?tab=verifications"   class="<?= $tab==='verifications'?'active':'' ?>"><i class="fas fa-id-card"></i> Verifications
     <?php if ($stats['pending_total']): ?><span class="nav-badge"><?= $stats['pending_total'] ?></span><?php endif; ?></a>
-  <a href="?tab=student_domains" class="<?= $tab==='student_domains'?'active':'' ?>"><i class="fas fa-at"></i> Student Domains
-    <span class="nav-badge"><?= $stats['student_domains'] ?></span></a>
 
   <div class="nav-section">Operations</div>
-  <a href="?tab=vehicles"        class="<?= $tab==='vehicles'?'active':'' ?>"><i class="fas fa-car"></i> Vehicles
-    <span class="nav-badge"><?= $stats['vehicles_total'] ?></span></a>
   <a href="?tab=complaints"      class="<?= $tab==='complaints'?'active':'' ?>"><i class="fas fa-flag"></i> Complaints
     <?php if ($stats['complaints']): ?><span class="nav-badge"><?= $stats['complaints'] ?></span><?php endif; ?></a>
   <a href="?tab=helpdesk"        class="<?= $tab==='helpdesk'?'active':'' ?>"><i class="fas fa-headset"></i> HelpDesk</a>
@@ -486,7 +531,7 @@ body { background:#f0f4f8; margin:0; }
         'activity'      => '<i class="fas fa-stream me-2 text-primary"></i>Activity Feed',
         'student_queue'    => '<i class="fas fa-user-graduate me-2 text-warning"></i>Student Verification Queue',
         'student_domains'  => '<i class="fas fa-at me-2 text-success"></i>Student Email Domains',
-        'vehicle_queue' => '<i class="fas fa-car me-2 text-primary"></i>Vehicle Verification Queue',
+        'user'          => '<i class="fas fa-user me-2 text-primary"></i>User Record',
         default         => '<i class="fas fa-tachometer-alt me-2 text-primary"></i>Overview',
       } ?>
     </h1>
@@ -619,7 +664,7 @@ body { background:#f0f4f8; margin:0; }
                 <img src="<?= htmlspecialchars($u['picture'] ?? '../Src/default.jpg') ?>"
                      style="width:32px;height:32px;border-radius:50%;object-fit:cover" alt="">
                 <div>
-                  <div class="fw-semibold"><?= htmlspecialchars($u['username']) ?></div>
+                  <div class="fw-semibold"><a href="?tab=user&id=<?= $u['id'] ?>" class="text-decoration-none text-reset"><?= htmlspecialchars($u['username']) ?></a></div>
                   <div class="text-muted" style="font-size:.7rem"><?= htmlspecialchars($u['governorate'] ?? '') ?></div>
                 </div>
               </div>
@@ -650,6 +695,9 @@ body { background:#f0f4f8; margin:0; }
             <td class="text-muted small"><?= date('d M Y', strtotime($u['created_at'])) ?></td>
             <td class="text-end">
               <div class="d-flex justify-content-end gap-1 flex-wrap">
+                <a href="?tab=user&id=<?= $u['id'] ?>" class="btn btn-outline-primary btn-sm" title="View user record">
+                  <i class="fas fa-eye"></i>
+                </a>
                 <button class="btn btn-outline-danger btn-sm" title="Manage sanctions"
                         data-bs-toggle="modal" data-bs-target="#sanctionModal<?= $u['id'] ?>">
                   <i class="fas fa-gavel"></i>
@@ -802,10 +850,10 @@ body { background:#f0f4f8; margin:0; }
   <ul class="nav nav-pills mb-3 flex-wrap gap-1">
     <?php
     $verTabs = [
-      'students'      => ['Students',      'fa-user-graduate', (int)$stats['pending_ver'] + (int)$stats['pending_student']],
-      'vehicles'      => ['Vehicles',      'fa-car',           (int)$stats['pending_vehicle']],
-      'drivers'       => ['Drivers',       'fa-id-card',       0],
-      'organizations' => ['Organizations', 'fa-building',      (int)$stats['pending_org']],
+      'students'      => ['Students',       'fa-user-graduate', (int)$stats['pending_ver'] + (int)$stats['pending_student']],
+      'drivers'       => ['Driver Review',  'fa-id-card',       (int)$stats['pending_vehicle']],
+      'organizations' => ['Organizations',  'fa-building',      (int)$stats['pending_org']],
+      'domains'       => ['Student Domains','fa-at',            0],
     ];
     foreach ($verTabs as $key => [$label, $icon, $count]):
       $active = $verifyType === $key;
@@ -889,19 +937,20 @@ body { background:#f0f4f8; margin:0; }
       <?php endforeach; ?>
     <?php endif; ?>
 
-  <?php /* ─── Vehicles sub-tab ─── */ elseif ($verifyType === 'vehicles'): ?>
+  <?php /* ─── Driver Review sub-tab (licence + vehicle, one decision) ─── */ elseif ($verifyType === 'drivers'): ?>
     <div class="fd-card mb-3 p-3" style="background:#eff6ff;border-left:4px solid #3b82f6">
-      <div class="fw-semibold mb-1"><i class="fas fa-info-circle me-2 text-primary"></i>Vehicle Verification Queue</div>
-      <div class="small text-muted">These vehicles have a carte grise photo awaiting admin review. Check that the plate number matches the photo and the document is valid.</div>
+      <div class="fw-semibold mb-1"><i class="fas fa-info-circle me-2 text-primary"></i>Driver Review Queue</div>
+      <div class="small text-muted">Each submission is reviewed once and covers <strong>both the driver's licence and their vehicle</strong>. Check the permis de conduire and carte grise against the plate, then approve or reject. Approving lets the driver offer rides; the decision then shows on the driver's user record.</div>
     </div>
-    <?php if (empty($pendingVehicles)): ?>
-      <div class="empty-state"><i class="fas fa-car"></i><p>No vehicles awaiting verification</p></div>
+    <?php if (empty($pendingDriverReviews)): ?>
+      <div class="empty-state"><i class="fas fa-id-card"></i><p>No driver reviews awaiting a decision</p></div>
     <?php else: ?>
-      <?php foreach ($pendingVehicles as $v): ?>
+      <?php foreach ($pendingDriverReviews as $v): ?>
       <div class="fd-card mb-3">
         <div class="d-flex justify-content-between flex-wrap gap-3">
           <div class="flex-grow-1">
-            <div class="fw-bold"><?= htmlspecialchars($v['owner_name']) ?>
+            <div class="fw-bold">
+              <a href="?tab=user&id=<?= (int)$v['owner_id'] ?>" class="text-decoration-none"><?= htmlspecialchars($v['owner_name']) ?></a>
               <span class="text-muted fw-normal small ms-2"><?= htmlspecialchars($v['owner_email']) ?></span>
             </div>
             <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
@@ -910,36 +959,40 @@ body { background:#f0f4f8; margin:0; }
               <?php if ($v['plate_number'] ?? ''): ?>
               <span class="badge bg-dark"><i class="fas fa-car-side me-1"></i><?= htmlspecialchars($v['plate_number']) ?></span>
               <?php endif; ?>
-              <span class="badge bg-info text-dark"><?= $v['seats'] ?> seats</span>
+              <span class="badge bg-info text-dark"><?= (int)($v['seats'] ?? 0) ?> seats</span>
             </div>
-            <?php if ($v['id_card_photo'] ?? ''): ?>
-            <div class="mt-3">
-              <div class="fw-semibold small mb-1"><i class="fas fa-file-image me-1 text-primary"></i>Carte Grise Photo:</div>
-              <a href="../<?= htmlspecialchars($v['id_card_photo']) ?>" target="_blank">
-                <img src="../<?= htmlspecialchars($v['id_card_photo']) ?>"
-                     style="max-height:160px;max-width:340px;border-radius:8px;border:2px solid #e2e8f0;object-fit:contain"
-                     onerror="this.outerHTML='<span class=\'text-danger small\'>Photo not found</span>'"
-                     alt="Carte Grise">
-              </a>
+
+            <div class="row g-3 mt-1">
+              <?php
+                $reviewDocs = [
+                  ['Driver\'s licence (permis)', 'fa-id-card',    $v['permis_conduire'] ?? ''],
+                  ['Carte grise',               'fa-file-image',  $v['carte_grise']     ?? ''],
+                  ['Vehicle photo',             'fa-car',         $v['car_image'] ?: ($v['photo'] ?? '')],
+                ];
+                foreach ($reviewDocs as [$dLabel, $dIcon, $dVal]):
+                  $url = $docUrl($dVal);
+              ?>
+              <div class="col-auto">
+                <div class="fw-semibold small mb-1"><i class="fas <?= $dIcon ?> me-1 text-primary"></i><?= $dLabel ?></div>
+                <?php if ($url): ?>
+                <a href="<?= htmlspecialchars($url) ?>" target="_blank">
+                  <img src="<?= htmlspecialchars($url) ?>"
+                       style="max-height:150px;max-width:240px;border-radius:8px;border:2px solid #e2e8f0;object-fit:contain"
+                       onerror="this.outerHTML='<span class=\'text-danger small\'>File not found</span>'"
+                       alt="<?= htmlspecialchars($dLabel) ?>">
+                </a>
+                <?php else: ?>
+                <div class="text-muted small fst-italic">Not provided</div>
+                <?php endif; ?>
+              </div>
+              <?php endforeach; ?>
             </div>
-            <?php endif; ?>
-            <?php if ($v['photo'] ?? ''): ?>
-            <div class="mt-2">
-              <div class="fw-semibold small mb-1"><i class="fas fa-image me-1 text-success"></i>Vehicle Photo:</div>
-              <a href="../<?= htmlspecialchars($v['photo']) ?>" target="_blank">
-                <img src="../<?= htmlspecialchars($v['photo']) ?>"
-                     style="max-height:120px;max-width:240px;border-radius:8px;border:2px solid #e2e8f0;object-fit:cover"
-                     onerror="this.style.display='none'"
-                     alt="Vehicle">
-              </a>
-            </div>
-            <?php endif; ?>
           </div>
           <div class="d-flex flex-column gap-2 align-items-end">
-            <form method="POST">
+            <form method="POST" onsubmit="return confirm('Approve this driver? They will be able to offer rides.')">
               <input type="hidden" name="action" value="approve_vehicle">
               <input type="hidden" name="target_id" value="<?= $v['id'] ?>">
-              <button class="btn-fd-success btn btn-sm"><i class="fas fa-check me-1"></i>Verify Vehicle</button>
+              <button class="btn-fd-success btn btn-sm"><i class="fas fa-check me-1"></i>Approve driver</button>
             </form>
             <form method="POST" class="d-flex gap-1 align-items-start">
               <input type="hidden" name="action" value="reject_vehicle">
@@ -952,20 +1005,6 @@ body { background:#f0f4f8; margin:0; }
       </div>
       <?php endforeach; ?>
     <?php endif; ?>
-
-  <?php /* ─── Drivers sub-tab (no flow exists yet) ─── */ elseif ($verifyType === 'drivers'): ?>
-    <div class="fd-card p-5 text-center">
-      <i class="fas fa-id-card-alt fa-3x text-muted mb-3"></i>
-      <h6 class="fw-bold">No driver verification queue yet</h6>
-      <p class="text-muted small mb-3">
-        Driver applications aren't separately reviewed in the current flow.<br>
-        To make a user a driver, use the <strong>Promote</strong> button in
-        <a href="?tab=users">Users</a>.
-      </p>
-      <a href="?tab=users" class="btn btn-outline-primary btn-sm">
-        <i class="fas fa-users me-1"></i>Go to Users
-      </a>
-    </div>
 
   <?php /* ─── Organizations sub-tab (pending only) ─── */ elseif ($verifyType === 'organizations'): ?>
     <div class="fd-card mb-3 p-3" style="background:#f0fdf4;border-left:4px solid #22c55e">
@@ -1014,9 +1053,8 @@ body { background:#f0f4f8; margin:0; }
       </div>
       <?php endforeach; ?>
     <?php endif; ?>
-  <?php endif; /* end verify sub-tabs */ ?>
 
-  <?php /* ═══ STUDENT DOMAINS ════════════════════════════════════════════ */ elseif ($tab === 'student_domains'): ?>
+  <?php /* ─── Student Domains sub-tab ─── */ elseif ($verifyType === 'domains'): ?>
   <div class="fd-card mb-3 p-3" style="background:#f0fdf4;border-left:4px solid #22c55e">
     <div class="fw-semibold mb-1"><i class="fas fa-info-circle me-2 text-success"></i>Student Email Domains</div>
     <div class="small text-muted">Users who register with an email from these domains are automatically granted the 50% student discount. Adding or removing a domain here takes effect immediately for new sign-ups. Removing a domain also revokes student status for existing users whose email matches only that domain.</div>
@@ -1074,71 +1112,136 @@ body { background:#f0f4f8; margin:0; }
     </table>
   </div>
   <?php endif; ?>
+  <?php endif; /* end verify sub-tabs */ ?>
 
-  <?php /* ═══ VEHICLES DIRECTORY ═════════════════════════════════════════ */ elseif ($tab === 'vehicles'): ?>
-  <div class="fd-card mb-3 p-3" style="background:#eff6ff;border-left:4px solid #3b82f6">
-    <div class="fw-semibold mb-1"><i class="fas fa-info-circle me-2 text-primary"></i>All Vehicles</div>
-    <div class="small text-muted">Read-only directory of every vehicle on the platform. Pending carte-grise approvals live under <a href="?tab=verifications&type=vehicles">Verifications → Vehicles</a>.</div>
-  </div>
+  <?php /* ═══ USER RECORD (detail) ═══════════════════════════════════════ */ elseif ($tab === 'user'): ?>
+  <a href="?tab=users" class="btn btn-outline-secondary btn-sm mb-3"><i class="fas fa-arrow-left me-1"></i>Back to Users</a>
 
-  <div class="mb-3">
-    <input class="form-control" id="vehicleSearch" placeholder="Search owner, plate, model…" style="max-width:340px">
-  </div>
-
-  <?php if (empty($allVehicles)): ?>
-    <div class="empty-state"><i class="fas fa-car"></i><p>No vehicles registered yet</p></div>
+  <?php if (!$detailUser): ?>
+    <div class="empty-state"><i class="fas fa-user-slash"></i><p>User not found.</p></div>
   <?php else: ?>
-  <div class="fd-card p-0 overflow-hidden">
-    <div class="table-responsive">
-      <table class="table table-hover align-middle small mb-0" id="vehiclesTable">
-        <thead class="table-light">
-          <tr>
-            <th class="ps-3">Owner</th>
-            <th>Type</th>
-            <th>Vehicle</th>
-            <th>Plate</th>
-            <th>Seats</th>
-            <th>Status</th>
-            <th class="pe-3">Registered</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($allVehicles as $v): ?>
-          <tr>
-            <td class="ps-3">
-              <div class="fw-semibold"><?= htmlspecialchars($v['owner_name']) ?></div>
-              <div class="text-muted" style="font-size:.7rem"><?= htmlspecialchars($v['owner_email']) ?></div>
-            </td>
-            <td><span class="badge bg-secondary"><?= htmlspecialchars(ucfirst($v['type'] ?? 'car')) ?></span></td>
-            <td class="small">
-              <?= htmlspecialchars(trim(($v['make'] ?? '') . ' ' . ($v['model'] ?? ''))) ?: '<span class="text-muted">—</span>' ?>
-              <?php if (!empty($v['year'])): ?><span class="text-muted">· <?= (int)$v['year'] ?></span><?php endif; ?>
-            </td>
-            <td>
-              <?php if (!empty($v['plate_number'])): ?>
-                <code><?= htmlspecialchars($v['plate_number']) ?></code>
+    <!-- ── User identity ── -->
+    <div class="fd-card mb-3 p-4">
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <img src="<?= htmlspecialchars($detailUser['picture'] ?? '../Src/default.jpg') ?>"
+             style="width:64px;height:64px;border-radius:50%;object-fit:cover" alt="">
+        <div class="flex-grow-1">
+          <div class="fw-bold fs-5"><?= htmlspecialchars($detailUser['username']) ?></div>
+          <div class="text-muted small"><i class="fas fa-envelope me-1"></i><?= htmlspecialchars($detailUser['email']) ?>
+            <?php if (!empty($detailUser['governorate'])): ?>
+              &nbsp;·&nbsp;<i class="fas fa-map-marker-alt me-1"></i><?= htmlspecialchars($detailUser['governorate']) ?>
+            <?php endif; ?>
+          </div>
+          <div class="mt-2 d-flex flex-wrap gap-1">
+            <?php if ($detailUser['is_admin']): ?><span class="badge bg-dark">Admin</span><?php endif; ?>
+            <?php if ($detailUser['is_driver']): ?><span class="badge bg-primary">Driver</span><?php endif; ?>
+            <?php if ($detailUser['is_student']): ?><span class="badge bg-info text-dark">Student</span><?php endif; ?>
+            <?php if ($detailUser['is_helpdesk_agent']): ?><span class="badge bg-success">Agent</span><?php endif; ?>
+            <?php if ($detailUser['suspended']): ?>
+              <?php if (empty($detailUser['suspended_until'])): ?>
+                <span class="badge bg-danger"><i class="fas fa-ban me-1"></i>Banned</span>
               <?php else: ?>
-                <span class="text-muted">—</span>
+                <span class="badge bg-danger"><i class="fas fa-clock me-1"></i>Suspended</span>
               <?php endif; ?>
-            </td>
-            <td><?= (int)($v['seats'] ?? 0) ?></td>
-            <td>
-              <?php if (!empty($v['verified'])): ?>
-                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Verified</span>
-              <?php elseif (!empty($v['id_card_photo'])): ?>
-                <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Pending</span>
-              <?php else: ?>
-                <span class="badge bg-secondary">Not submitted</span>
-              <?php endif; ?>
-            </td>
-            <td class="pe-3 text-muted small"><?= date('d M Y', strtotime($v['created_at'])) ?></td>
-          </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
+            <?php endif; ?>
+          </div>
+        </div>
+        <div class="text-end text-muted small">
+          <div><i class="fas fa-calendar me-1"></i>Joined <?= date('d M Y', strtotime($detailUser['created_at'])) ?></div>
+        </div>
+      </div>
     </div>
-  </div>
-  <?php endif; ?>
+
+    <?php if ($detailDriver): ?>
+    <!-- ── Driver profile (a role this user has) ── -->
+    <div class="fd-card mb-3 p-4" style="border-left:4px solid #16a34a">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+        <div class="fw-bold"><i class="fas fa-id-badge me-2 text-success"></i>Driver profile</div>
+        <span class="text-muted small">
+          <i class="fas fa-star text-warning me-1"></i><?= number_format($detailUser['avg_rating'] ?? 5, 1) ?>
+          &nbsp;·&nbsp;<?= (int)($detailUser['total_trips'] ?? 0) ?> trips
+        </span>
+      </div>
+      <div class="small text-muted mb-3">Licence and vehicle are reviewed together as one <strong>Driver review</strong>. Pending submissions are decided under <a href="?tab=verifications&type=drivers">Verifications → Driver Review</a>.</div>
+
+      <?php
+        $primary = $detailVehicles[0] ?? null;
+        $vStatus = $primary['verification_status'] ?? null;          // shared decision
+        if ($primary === null) $vStatus = 'none';
+      ?>
+
+      <div class="row g-3">
+        <!-- Vehicle card -->
+        <div class="col-md-6">
+          <div class="border rounded p-3 h-100" style="background:#fffdf5">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div class="fw-bold"><i class="fas fa-car me-2 text-warning"></i>Vehicle</div>
+              <?= $primary ? $statusBadge($vStatus) : '<span class="badge bg-secondary">Not submitted</span>' ?>
+            </div>
+            <?php if ($primary): ?>
+              <div class="small mb-2">
+                <span class="badge bg-secondary me-1"><?= htmlspecialchars(ucfirst($primary['type'] ?? 'car')) ?></span>
+                <?= htmlspecialchars(trim(($primary['make'] ?? '') . ' ' . ($primary['model'] ?? ''))) ?>
+                <?php if (!empty($primary['plate_number'])): ?>
+                  <span class="badge bg-dark ms-1"><i class="fas fa-car-side me-1"></i><?= htmlspecialchars($primary['plate_number']) ?></span>
+                <?php endif; ?>
+              </div>
+              <div class="d-flex flex-wrap gap-3">
+                <?php
+                  $vehDocs = [
+                    ['Carte grise',  $primary['carte_grise'] ?? ''],
+                    ['Vehicle photo', $primary['car_image'] ?: ($primary['photo'] ?? '')],
+                  ];
+                  foreach ($vehDocs as [$dLabel, $dVal]): $u = $docUrl($dVal); if (!$u) continue; ?>
+                  <a href="<?= htmlspecialchars($u) ?>" target="_blank" class="d-inline-block">
+                    <div class="text-muted" style="font-size:.7rem"><?= htmlspecialchars($dLabel) ?></div>
+                    <img src="<?= htmlspecialchars($u) ?>" style="max-height:90px;max-width:130px;border-radius:6px;border:1px solid #e2e8f0;object-fit:contain"
+                         onerror="this.outerHTML='<span class=\'text-danger small\'>missing</span>'" alt="<?= htmlspecialchars($dLabel) ?>">
+                  </a>
+                <?php endforeach; ?>
+              </div>
+              <?php if ($vStatus === 'rejected' && !empty($primary['rejection_note'])): ?>
+                <div class="alert-fd-danger small mt-2 p-2"><i class="fas fa-exclamation-circle me-1"></i><?= htmlspecialchars($primary['rejection_note']) ?></div>
+              <?php endif; ?>
+              <?php if (count($detailVehicles) > 1): ?>
+                <div class="text-muted small mt-2 fst-italic">+ <?= count($detailVehicles) - 1 ?> more vehicle(s) on file</div>
+              <?php endif; ?>
+            <?php else: ?>
+              <div class="text-muted small fst-italic">This driver has not submitted a vehicle yet.</div>
+            <?php endif; ?>
+          </div>
+        </div>
+
+        <!-- Driver's licence card -->
+        <div class="col-md-6">
+          <div class="border rounded p-3 h-100" style="background:#fffdf5">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div class="fw-bold"><i class="fas fa-id-card me-2 text-warning"></i>Driver's licence</div>
+              <?= $primary ? $statusBadge($vStatus) : '<span class="badge bg-secondary">Not submitted</span>' ?>
+            </div>
+            <div class="small mb-2">
+              <span class="text-muted">Licence no.</span>
+              <strong><?= htmlspecialchars($detailUser['license_number'] ?? '') ?: '—' ?></strong>
+            </div>
+            <?php $permUrl = $docUrl($primary['permis_conduire'] ?? ''); ?>
+            <?php if ($permUrl): ?>
+              <a href="<?= htmlspecialchars($permUrl) ?>" target="_blank" class="d-inline-block">
+                <div class="text-muted" style="font-size:.7rem">Permis de conduire</div>
+                <img src="<?= htmlspecialchars($permUrl) ?>" style="max-height:90px;max-width:130px;border-radius:6px;border:1px solid #e2e8f0;object-fit:contain"
+                     onerror="this.outerHTML='<span class=\'text-danger small\'>missing</span>'" alt="Permis de conduire">
+              </a>
+            <?php else: ?>
+              <div class="text-muted small fst-italic">No licence document on file.</div>
+            <?php endif; ?>
+            <?php if ($vStatus === 'rejected' && !empty($primary['rejection_note'])): ?>
+              <div class="alert-fd-danger small mt-2 p-2"><i class="fas fa-exclamation-circle me-1"></i><?= htmlspecialchars($primary['rejection_note']) ?></div>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+    </div>
+    <?php endif; /* driver profile */ ?>
+  <?php endif; /* detail user exists */ ?>
 
   <?php /* ═══ COMPLAINTS ══════════════════════════════════════════════════ */ elseif ($tab === 'complaints'): ?>
   <?php if (empty($openComplaints)): ?>
@@ -1411,14 +1514,6 @@ const s = document.getElementById('userSearch');
 if (s) s.addEventListener('input', function() {
     const q = this.value.toLowerCase();
     document.querySelectorAll('#usersTable tbody tr').forEach(tr => {
-        tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
-    });
-});
-
-const vs = document.getElementById('vehicleSearch');
-if (vs) vs.addEventListener('input', function() {
-    const q = this.value.toLowerCase();
-    document.querySelectorAll('#vehiclesTable tbody tr').forEach(tr => {
         tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
     });
 });

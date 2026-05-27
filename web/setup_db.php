@@ -187,6 +187,9 @@ CREATE TABLE vehicles (
     photo         TEXT,
     notes         TEXT,
     is_verified   INTEGER DEFAULT 0,
+    verification_status TEXT DEFAULT 'pending'
+                  CHECK (verification_status IN ('pending','approved','rejected')),
+    rejection_note TEXT,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 )", "Create vehicles", $ok, $err);
 
