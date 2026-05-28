@@ -104,6 +104,7 @@ function generate_token(int $userId): string {
 function user_payload(array $u): array {
     return [
         'id'               => (int)$u['id'],
+        'public_id'        => $u['public_id'] ?? null,
         'username'         => $u['username'],
         'email'            => $u['email'],
         'phone'            => $u['phone'] ?? null,

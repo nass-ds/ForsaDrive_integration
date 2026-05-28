@@ -17,8 +17,12 @@ class Database {
         try {
             $this->connection = new PDO("sqlite:" . $dbPath);
             $this->connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            // WAL lets PHP and the Dart server share the file concurrently
+            // WAL lets PHP and the Dart server share the file concurrently.
+            // busy_timeout makes the cross-runtime guarded writes in
+            // HelpdeskAssignmentService wait instead of failing with
+            // SQLITE_BUSY when PHP and Dart try to update the same row.
             $this->connection->exec("PRAGMA journal_mode = WAL");
+            $this->connection->exec("PRAGMA busy_timeout = 5000");
             $this->connection->exec("PRAGMA foreign_keys = ON");
 
             // Auto-migrate: web pages expect columns/tables that the Dart API
@@ -53,6 +57,9 @@ class Database {
             // and a running warning tally to drive escalation.
             'suspended_until'      => "DATETIME",
             'warnings_count'       => "INTEGER DEFAULT 0",
+            // Public ForsaDrive ID — generated at signup, immutable, safe to share.
+            // Backfilled below for any pre-existing user without one.
+            'public_id'            => "TEXT",
         ];
         foreach ($userCols as $col => $ddl) {
             try {
@@ -174,9 +181,13 @@ class Database {
 
         // ── helpdesk_conversations columns used by the agent console ─────────
         $helpdeskCols = [
-            'priority'         => "TEXT DEFAULT 'normal'",
-            'agent_initiated'  => "INTEGER DEFAULT 0",
-            'updated_at'       => "DATETIME",
+            'priority'          => "TEXT DEFAULT 'normal'",
+            'agent_initiated'   => "INTEGER DEFAULT 0",
+            'updated_at'        => "DATETIME",
+            // Auto-assignment (§ helpdesk-assignment): when the ticket was
+            // assigned and whether it was done automatically or manually.
+            'assigned_at'       => "DATETIME",
+            'assignment_method' => "TEXT",
         ];
         foreach ($helpdeskCols as $col => $ddl) {
             try {
@@ -270,5 +281,60 @@ class Database {
                 )
             ");
         } catch (PDOException $e) {}
+
+        // ── Public ForsaDrive ID + report-by-public-id (identification spec) ──
+        try {
+            $this->connection->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_public_id ON users(public_id)");
+        } catch (PDOException $e) {}
+
+        // rides.completed_at — records when a ride moved to status='completed';
+        // feeds the 48-hour full-profile-access window.
+        try {
+            $this->connection->exec("ALTER TABLE rides ADD COLUMN completed_at DATETIME");
+        } catch (PDOException $e) {}
+        try {
+            // Legacy completed rides predate this column — use departure_time as a
+            // best-effort timestamp so the 48-hour rule still works.
+            $this->connection->exec("UPDATE rides SET completed_at = COALESCE(completed_at, departure_time)
+                                     WHERE status = 'completed' AND completed_at IS NULL");
+        } catch (PDOException $e) {}
+
+        try {
+            $this->connection->exec("
+                CREATE TABLE IF NOT EXISTS reports (
+                    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                    reporter_id        INTEGER NOT NULL,
+                    reported_user_id   INTEGER,
+                    reported_public_id TEXT NOT NULL,
+                    ride_id            INTEGER,
+                    category           TEXT NOT NULL,
+                    description        TEXT NOT NULL,
+                    status             TEXT NOT NULL DEFAULT 'pending',
+                    admin_note         TEXT,
+                    handled_by         INTEGER,
+                    handled_at         DATETIME,
+                    created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+            $this->connection->exec("CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports(reporter_id, created_at DESC)");
+            $this->connection->exec("CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_user_id, created_at DESC)");
+            $this->connection->exec("CREATE INDEX IF NOT EXISTS idx_reports_public_id ON reports(reported_public_id)");
+            $this->connection->exec("CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at DESC)");
+            $this->connection->exec("CREATE INDEX IF NOT EXISTS idx_reports_ride ON reports(ride_id)");
+        } catch (PDOException $e) {}
+
+        // Backfill: every user must have a public_id. Idempotent — only fills
+        // rows that are currently NULL/empty. Imported lazily to keep this file
+        // free of business logic.
+        try {
+            if (!class_exists('PublicIdService', false)) {
+                $svc = __DIR__ . '/publicid.php';
+                if (file_exists($svc)) require_once $svc;
+            }
+            if (class_exists('PublicIdService', false)) {
+                PublicIdService::backfillAll($this->connection);
+            }
+        } catch (Throwable $e) { /* never block boot */ }
     }
 }

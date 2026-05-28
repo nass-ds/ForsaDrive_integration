@@ -117,6 +117,7 @@ function navLink(string $href, string $icon, string $label, string $cur, string 
         <?= navLink('ratings.php', 'star', 'Ratings', $cur, 'ratings.php') ?>
         <?= navLink('vehicles.php', 'car-side', 'My Vehicles', $cur, 'vehicles.php') ?>
         <?= navLink('complaints.php', 'flag', 'Complaints', $cur, 'complaints.php') ?>
+        <?= navLink('report_user.php', 'user-shield', 'Report a User', $cur, 'report_user.php') ?>
         <?= navLink('messages.php', 'comments', 'Messages', $cur, 'messages.php', $unreadMsg) ?>
         <?= navLink('notifications.php', 'bell', 'Notifications', $cur, 'notifications.php', $unreadNotif) ?>
         <?= navLink('helpdesk.php', 'headset', 'Help &amp; Support', $cur, 'helpdesk.php') ?>

@@ -135,11 +135,74 @@ if ($group2 === 'student') {
     json_error('Not found', 404);
 }
 
-// ── /users/me ─────────────────────────────────────────────────────────────────
+// ── /users/me + /users/:publicId/{limited-profile,full-profile} + /users/search ──
 if ($group2 === 'users') {
     $user = auth_user();
     if ($method === 'GET' && $action === 'me') {
         json_ok(['user' => user_payload($user)]);
+    }
+
+    // GET /users/search?public_id=FD-D-20001 — admin/helpdesk lookup.
+    // For normal users this is locked to public_id resolution (no email/name
+    // search) so they can verify an ID before reporting.
+    if ($method === 'GET' && $action === 'search') {
+        require_once __DIR__ . '/../classes/publicid.php';
+        require_once __DIR__ . '/../classes/profileaccess.php';
+        $pid = trim($_GET['public_id'] ?? '');
+        if ($pid === '') json_error('public_id is required', 422);
+        $target = PublicIdService::findUser(db(), $pid);
+        if (!$target) json_error('No ForsaDrive user has that ID.', 404);
+
+        $isStaff = !empty($user['is_admin']) || !empty($user['is_helpdesk_agent']);
+        if ($isStaff) {
+            // Staff view — full payload + report counts + sanction state.
+            $pdo = db();
+            $sent = (int)$pdo->query("SELECT COUNT(*) FROM reports WHERE reporter_id = " . (int)$target['id'])->fetchColumn();
+            $recv = (int)$pdo->query("SELECT COUNT(*) FROM reports WHERE reported_user_id = " . (int)$target['id'])->fetchColumn();
+            json_ok([
+                'user' => array_merge(user_payload($target), [
+                    'address'        => $target['address']        ?? null,
+                    'municipality'   => $target['municipality']   ?? null,
+                    'suspended_until'=> $target['suspended_until'] ?? null,
+                    'ban_reason'     => $target['ban_reason']     ?? null,
+                    'warnings_count' => (int)($target['warnings_count'] ?? 0),
+                ]),
+                'reports_sent'     => $sent,
+                'reports_received' => $recv,
+            ]);
+        }
+        // Normal user → limited profile only (used by the report form to
+        // confirm "yes that ID is real before I submit").
+        json_ok(['profile' => ProfileAccessService::limitedProfile(db(), $target)]);
+    }
+
+    // GET /users/{publicId}/limited-profile
+    // GET /users/{publicId}/full-profile?ride_id=N
+    if ($method === 'GET' && $action !== '' && $action !== 'me' && $action !== 'search') {
+        require_once __DIR__ . '/../classes/publicid.php';
+        require_once __DIR__ . '/../classes/profileaccess.php';
+        $sub = $segments[2] ?? '';
+        $target = PublicIdService::findUser(db(), $action);
+        if (!$target) json_error('No ForsaDrive user has that ID.', 404);
+
+        if ($sub === 'limited-profile') {
+            json_ok(['profile' => ProfileAccessService::limitedProfile(db(), $target)]);
+        }
+        if ($sub === 'full-profile') {
+            $rideId = isset($_GET['ride_id']) ? (int)$_GET['ride_id'] : null;
+            $ok = ProfileAccessService::canViewFull(db(), $user, $target, $rideId);
+            if (!$ok) {
+                // Spec: backend must refuse — UI should fall back to limited.
+                http_response_code(403);
+                echo json_encode([
+                    'message'    => 'Full profile is only available during a confirmed ride and for 48h after completion.',
+                    'profile'    => ProfileAccessService::limitedProfile(db(), $target),
+                    'access_level' => 'limited',
+                ]);
+                exit;
+            }
+            json_ok(['profile' => ProfileAccessService::fullProfile(db(), $target, $rideId)]);
+        }
     }
 }
 

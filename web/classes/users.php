@@ -10,6 +10,7 @@ class User {
     private $balance;
     private $password;
     private $picture;
+    private $publicId;
     private $db;
 
     public function __construct(PDO $db) {
@@ -41,7 +42,11 @@ class User {
                 
                 // Add profile picture support (new)
                 $this->picture = $user['picture'] ?? null;
-                
+
+                // Public ForsaDrive ID (immutable). Empty for users that
+                // pre-date the migration AND haven't been backfilled yet.
+                $this->publicId = $user['public_id'] ?? null;
+
                 return true;
             }
             return false;
@@ -215,6 +220,7 @@ class User {
     public function toArray(): array {
         return [
             'id'              => $this->id,
+            'public_id'       => $this->publicId,
             'username'        => $this->username,
             'email'           => $this->email,
             'is_driver'       => $this->isDriver,
@@ -225,6 +231,8 @@ class User {
             'profile_picture' => $this->picture ?? '../Src/default.jpg',
         ];
     }
+
+    public function getPublicId(): ?string { return $this->publicId; }
 
     public function getId(): ?int { return $this->id; }
     public function getUsername(): ?string { return $this->username; }

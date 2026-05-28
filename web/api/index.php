@@ -62,6 +62,9 @@ switch ($group) {
     case 'admin':
         require __DIR__ . '/admin_api.php';
         break;
+    case 'reports':
+        require __DIR__ . '/reports.php';
+        break;
     default:
         json_error('Not found', 404);
 }

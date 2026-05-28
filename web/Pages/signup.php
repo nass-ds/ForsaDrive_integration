@@ -1,5 +1,6 @@
 <?php
 require_once '../server/session.php';
+require_once '../classes/publicid.php';
 $regions = require_once '../data/tunisia_regions.php';
 
 // Redirect if already logged in
@@ -124,6 +125,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $governorate, $municipality, $address, $is_driver, $is_student,
                 ]);
                 $userId = (int)$pdo->lastInsertId();
+
+                // Issue the public ForsaDrive ID — generated once, immutable,
+                // safe to share. Format FD-{P|D|A|H}-{seq}; role decides the letter.
+                PublicIdService::ensure($pdo, $userId);
 
                 // Profile photo
                 $picturePath = null;

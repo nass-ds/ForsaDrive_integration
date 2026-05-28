@@ -75,6 +75,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                ->execute([$cid, null, 'bot', botReply($firstMsg)]);
             $db->prepare("UPDATE helpdesk_conversations SET updated_at=datetime('now') WHERE id=?")
                ->execute([$cid]);
+
+            // Auto-assign to the longest-idle AVAILABLE agent (one ticket each).
+            // If every eligible agent is busy, the ticket stays open & queued —
+            // it will be auto-assigned the moment one of them resolves their ticket.
+            require_once '../classes/helpdesk_assignment.php';
+            $res = HelpdeskAssignmentService::autoAssign($db, $cid);
+            if ($res['result'] === 'assigned' && !empty($res['agent'])) {
+                // link → mobile deep-link; the Flutter NotificationsScreen
+                // pushes this path, the GoRoute reads ?conv=N and auto-opens
+                // the ticket in the helpdesk screen.
+                $db->prepare("INSERT INTO notifications (user_id, type, title, body, link) VALUES (?,?,?,?,?)")
+                   ->execute([
+                       $res['agent']['id'],
+                       'helpdesk',
+                       'HelpDesk Ticket Auto-Assigned',
+                       'New support ticket auto-assigned to you: ' . mb_substr($subject, 0, 80),
+                       '/helpdesk?conv=' . $cid,
+                   ]);
+            }
+
             header("Location: helpdesk.php?conv=$cid"); exit();
         }
 
@@ -152,6 +172,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Resolve/close
     } elseif ($action === 'close' && $convId && $isSupervisor) {
         $db->prepare("UPDATE helpdesk_conversations SET status='resolved', updated_at=datetime('now') WHERE id=?")->execute([$convId]);
+        // Queue advance: hand the freed agent the next waiting ticket, if any.
+        require_once '../classes/helpdesk_assignment.php';
+        $picked = HelpdeskAssignmentService::onTicketClosedOrResolved($db, $convId);
+        if ($picked) {
+            $db->prepare("INSERT INTO notifications (user_id, type, title, body, link) VALUES (?,?,?,?,?)")
+               ->execute([
+                   $uid, // the freed agent (who just resolved the ticket)
+                   'helpdesk',
+                   'HelpDesk Ticket Auto-Assigned',
+                   'A waiting ticket has been auto-assigned to you: ' . mb_substr((string)($picked['subject'] ?? 'Support request'), 0, 80),
+                   '/helpdesk?conv=' . (int)$picked['id'],
+               ]);
+        }
         header("Location: helpdesk.php"); exit();
 
     // Reopen

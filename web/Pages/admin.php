@@ -7,7 +7,6 @@ require_once '../classes/sanctions.php';
 require_once '../classes/audit_log.php';
 require_once '../classes/announcements.php';
 require_once '../classes/promo_codes.php';
-
 if (!isLoggedIn() || empty($_SESSION['user_data']['is_admin'])) {
     header('Location: interface.php'); exit();
 }
@@ -38,6 +37,21 @@ if ($tab === 'student_domains') {
 // their owner's user record. Old links land on the driver list.
 if ($tab === 'vehicles') {
     header('Location: admin.php?tab=users&role=driver'); exit();
+}
+
+// Public-ID lookup (identification spec) — search bar in the Users tab posts
+// here. Resolve the ID to an internal user_id and redirect to their record.
+if ($tab === 'user_lookup') {
+    require_once '../classes/publicid.php';
+    $pid = trim($_GET['public_id'] ?? '');
+    if ($pid === '') {
+        header('Location: admin.php?tab=users'); exit();
+    }
+    $target = PublicIdService::findUser($db, $pid);
+    if ($target) {
+        header('Location: admin.php?tab=user&id=' . (int)$target['id']); exit();
+    }
+    header('Location: admin.php?tab=users&lookup=missing'); exit();
 }
 
 // ── Sub-filters used by the refactored tabs ──────────────────────────────────
@@ -82,7 +96,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'make_agent':
             $db->prepare("UPDATE users SET is_helpdesk_agent=1 WHERE id=?")->execute([$targetId]);
             $notif->create($targetId, 'HelpDesk Agent Role', 'You have been assigned as a HelpDesk support agent.', 'success');
-            $msg = 'User set as HelpDesk agent.'; $msgType = 'success'; $tab = 'users'; break;
+            // Queue drain: newly promoted agents are available by definition
+            // (zero active tickets). If anything is queued, hand them the
+            // oldest one. assignNextWaitingTicketToAgent uses the same guarded
+            // gates, so this is the same "agent newly available" code path
+            // as close/resolve and manual-reassign-frees-previous-holder.
+            require_once '../classes/helpdesk_assignment.php';
+            $picked = HelpdeskAssignmentService::assignNextWaitingTicketToAgent($db, $targetId);
+            if ($picked) {
+                $notif->create($targetId, 'HelpDesk Ticket Auto-Assigned',
+                    'A waiting ticket has been auto-assigned to you.', 'info',
+                    '/helpdesk?conv=' . (int)$picked['id']);
+                $msg = 'User set as HelpDesk agent. A waiting ticket was assigned to them.';
+            } else {
+                $msg = 'User set as HelpDesk agent.';
+            }
+            $msgType = 'success'; $tab = 'users'; break;
 
         case 'remove_agent':
             $db->prepare("UPDATE users SET is_helpdesk_agent=0 WHERE id=?")->execute([$targetId]);
@@ -114,6 +143,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $comp->updateStatus($targetId, 'dismissed', trim($_POST['admin_note'] ?? ''));
             $msg = 'Complaint dismissed.'; $msgType = 'success'; $tab = 'complaints'; break;
 
+        case 'review_complaint':
+            $comp->updateStatus($targetId, 'in_review', trim($_POST['admin_note'] ?? ''));
+            $msg = 'Complaint marked In Review.'; $msgType = 'success'; $tab = 'complaints'; break;
+
         case 'approve_org':
             $code = strtoupper(substr(md5(uniqid()), 0, 8));
             $db->prepare("UPDATE organizations SET status='active', discount_code=? WHERE id=?")->execute([$code, $targetId]);
@@ -124,10 +157,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg = 'Organization rejected.'; $msgType = 'danger'; $tab = 'organizations'; break;
 
         case 'assign_helpdesk':
+            // Manual override — admin explicitly chose the agent (may be busy).
+            // If this reassign freed the previous holder, the service advances
+            // the queue for them via the same guarded gates.
             $convId = (int)($_POST['conv_id'] ?? 0);
-            $db->prepare("UPDATE helpdesk_conversations SET agent_id=?, status='assigned', updated_at=datetime('now') WHERE id=?")->execute([$targetId, $convId]);
-            $notif->create($targetId, 'HelpDesk Ticket Assigned', 'A support ticket has been assigned to you.', 'info', 'helpdesk.php');
-            $msg = 'Ticket assigned.'; $msgType = 'success'; $tab = 'helpdesk'; break;
+            require_once '../classes/helpdesk_assignment.php';
+            $res = HelpdeskAssignmentService::manualAssign($db, $convId, $targetId);
+            if ($res['result'] === 'assigned') {
+                $notif->create($targetId, 'HelpDesk Ticket Assigned',
+                    'A support ticket has been manually assigned to you.', 'info',
+                    '/helpdesk?conv=' . $convId);
+                // Notify the previous holder if a queued ticket was just routed to them.
+                if (!empty($res['queued_for_prev']) && !empty($res['previous_agent_id'])) {
+                    $notif->create((int)$res['previous_agent_id'], 'HelpDesk Ticket Auto-Assigned',
+                        'A waiting ticket has been auto-assigned to you.', 'info',
+                        '/helpdesk?conv=' . (int)$res['queued_for_prev']['id']);
+                }
+                $msg = $res['was_busy']
+                    ? 'Ticket manually assigned. Warning: that agent already had an active ticket.'
+                    : 'Ticket manually assigned.';
+                if (!empty($res['queued_for_prev'])) {
+                    $msg .= ' Previous holder picked up the next queued ticket.';
+                }
+                $msgType = $res['was_busy'] ? 'warning' : 'success';
+            } else {
+                $msg = 'Selected user is not a HelpDesk agent.'; $msgType = 'danger';
+            }
+            $tab = 'helpdesk'; break;
+
+        case 'auto_assign_helpdesk':
+            // Fallback retry for the rare ticket that stayed open because no
+            // agent was available at creation time.
+            $convId = (int)($_POST['conv_id'] ?? 0);
+            require_once '../classes/helpdesk_assignment.php';
+            $res = HelpdeskAssignmentService::autoAssign($db, $convId);
+            switch ($res['result']) {
+                case 'assigned':
+                    $notif->create($res['agent']['id'], 'HelpDesk Ticket Auto-Assigned',
+                        'A waiting ticket has been auto-assigned to you.', 'info',
+                        '/helpdesk?conv=' . $convId);
+                    $msg = 'Ticket auto-assigned to ' . htmlspecialchars($res['agent']['username']) . '.';
+                    $msgType = 'success';
+                    break;
+                case 'no_eligible':
+                    $msg = 'No HelpDesk agents exist. Promote a user from the Users tab first.';
+                    $msgType = 'danger';
+                    break;
+                case 'waiting':
+                    $msg = 'All agents are currently busy. Ticket is waiting in queue.';
+                    $msgType = 'warning';
+                    break;
+                case 'already_assigned':
+                    $msg = 'Ticket is already assigned.'; $msgType = 'info'; break;
+                default:
+                    $msg = 'Ticket not found.'; $msgType = 'danger';
+            }
+            $tab = 'helpdesk'; break;
 
         // Student verification (new flow: users.student_status)
         case 'add_student_domain':
@@ -344,11 +429,28 @@ $verifications  = $db->query("SELECT sv.*, u.username, u.email, u.governorate FR
 $pendingStudents = $db->query("SELECT id, username, email, governorate, created_at FROM users WHERE is_student=0 AND is_student_verified=0 AND email LIKE '%@%' ORDER BY created_at ASC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
 $studentDomains  = $db->query("SELECT * FROM student_domains ORDER BY label")->fetchAll(PDO::FETCH_ASSOC);
 $pendingDriverReviews = $db->query("SELECT v.*, u.id AS owner_id, u.username AS owner_name, u.email AS owner_email FROM vehicles v JOIN users u ON u.id=v.user_id WHERE $driverReviewWhere ORDER BY v.created_at ASC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-$openComplaints = $comp->getAllComplaints('open');
 $orgs           = $db->query("SELECT * FROM organizations ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 $hdConvs        = $db->query("SELECT hc.*, u.username AS user_name, a.username AS agent_name, (SELECT COUNT(*) FROM helpdesk_messages hm WHERE hm.conv_id=hc.id AND hm.is_read=0 AND hm.sender_type='user') AS unread FROM helpdesk_conversations hc JOIN users u ON u.id=hc.user_id LEFT JOIN users a ON a.id=hc.agent_id ORDER BY hc.updated_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-$agents         = $db->query("SELECT id, username FROM users WHERE is_helpdesk_agent=1 ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
+// Eligible agents — single source of truth shared with HelpdeskAssignmentService
+// so the dropdown and the auto-assign service can never disagree.
+require_once '../classes/helpdesk_assignment.php';
+$agents = HelpdeskAssignmentService::getEligibleAgents($db);
+// Per-agent active-ticket count so the UI can warn when a manual override
+// targets a busy agent, and the row labels can distinguish "no eligible" from
+// "all busy".
+$agentActiveCount = [];
+foreach ($agents as $ag) {
+    $agentActiveCount[(int)$ag['id']] = HelpdeskAssignmentService::getAgentActiveTicketCount($db, (int)$ag['id']);
+}
+$anyAgentAvailable = false;
+foreach ($agentActiveCount as $cnt) {
+    if ($cnt === 0) { $anyAgentAvailable = true; break; }
+}
 $recentActivity = $db->query("SELECT bk.*, r.from_location, r.to_location, p.username AS passenger, dr.username AS driver FROM bookings bk JOIN rides r ON r.id=bk.ride_id JOIN users p ON p.id=bk.passenger_id JOIN users dr ON dr.id=r.driver_id ORDER BY bk.created_at DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
+
+// ── Complaints (with optional status filter) ─────────────────────────────────
+$complaintStatusFilter = $_GET['complaint_status'] ?? '';
+$allComplaints = $comp->getAllComplaints($complaintStatusFilter);
 
 // ── Admin tools data (§2.4) ──────────────────────────────────────────────────
 $announcements = $announce->recent(50);
@@ -648,13 +750,22 @@ body { background:#f0f4f8; margin:0; }
       <?php endforeach; ?>
     </div>
 
+    <!-- Public-ID lookup (identification spec) — jump straight to a user record. -->
+    <form method="GET" class="d-flex flex-wrap gap-2 mb-2" style="max-width:520px">
+      <input type="hidden" name="tab" value="user_lookup">
+      <input class="form-control" name="public_id" placeholder="Search by ForsaDrive ID, e.g. FD-D-20001"
+             value="<?= htmlspecialchars($_GET['public_id'] ?? '') ?>"
+             style="font-family:'Segoe UI Mono','Consolas',monospace; letter-spacing:.05em; max-width:340px">
+      <button class="btn btn-primary"><i class="fas fa-search me-1"></i>Lookup</button>
+    </form>
+
     <div class="mb-3">
-      <input class="form-control" id="userSearch" placeholder="Search name or email…" style="max-width:320px">
+      <input class="form-control" id="userSearch" placeholder="Search name, email, or ForsaDrive ID…" style="max-width:320px">
     </div>
     <div class="table-responsive">
       <table class="table table-hover align-middle small" id="usersTable">
         <thead class="table-light">
-          <tr><th>User</th><th>Email</th><th>Roles</th><th>Trips</th><th>Rating</th><th>Joined</th><th class="text-end">Actions</th></tr>
+          <tr><th>User</th><th>ForsaDrive ID</th><th>Email</th><th>Roles</th><th>Trips</th><th>Rating</th><th>Joined</th><th class="text-end">Actions</th></tr>
         </thead>
         <tbody>
           <?php foreach ($users as $u): ?>
@@ -668,6 +779,15 @@ body { background:#f0f4f8; margin:0; }
                   <div class="text-muted" style="font-size:.7rem"><?= htmlspecialchars($u['governorate'] ?? '') ?></div>
                 </div>
               </div>
+            </td>
+            <td>
+              <?php if (!empty($u['public_id'])): ?>
+                <span class="badge" style="background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;font-family:'Segoe UI Mono','Consolas',monospace;letter-spacing:.04em">
+                  <?= htmlspecialchars($u['public_id']) ?>
+                </span>
+              <?php else: ?>
+                <span class="text-muted small">—</span>
+              <?php endif; ?>
             </td>
             <td class="text-muted small"><?= htmlspecialchars($u['email']) ?></td>
             <td>
@@ -1127,11 +1247,33 @@ body { background:#f0f4f8; margin:0; }
              style="width:64px;height:64px;border-radius:50%;object-fit:cover" alt="">
         <div class="flex-grow-1">
           <div class="fw-bold fs-5"><?= htmlspecialchars($detailUser['username']) ?></div>
-          <div class="text-muted small"><i class="fas fa-envelope me-1"></i><?= htmlspecialchars($detailUser['email']) ?>
+          <?php if (!empty($detailUser['public_id'])): ?>
+          <div class="mt-1">
+            <span class="badge" style="background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;font-family:'Segoe UI Mono','Consolas',monospace;letter-spacing:.04em;font-size:.78rem">
+              <i class="fas fa-id-badge me-1"></i><?= htmlspecialchars($detailUser['public_id']) ?>
+            </span>
+          </div>
+          <?php endif; ?>
+          <div class="text-muted small mt-1"><i class="fas fa-envelope me-1"></i><?= htmlspecialchars($detailUser['email']) ?>
             <?php if (!empty($detailUser['governorate'])): ?>
               &nbsp;·&nbsp;<i class="fas fa-map-marker-alt me-1"></i><?= htmlspecialchars($detailUser['governorate']) ?>
             <?php endif; ?>
           </div>
+          <?php
+            // Reports linked to this user (identification spec) — quick summary
+            // so admins can act without leaving the user record.
+            $userReportsSent = ReportService::listMine($db, (int)$detailUser['id'], 5);
+            $userReportsAgainst = ReportService::listAgainst($db, (int)$detailUser['id']);
+            if (!empty($userReportsSent) || !empty($userReportsAgainst)):
+          ?>
+          <div class="small mt-1">
+            <a href="?tab=reports&report_public_id=<?= urlencode($detailUser['public_id'] ?? '') ?>"
+               class="text-decoration-none">
+              <i class="fas fa-user-shield text-danger me-1"></i>
+              <?= count($userReportsAgainst) ?> received · <?= count($userReportsSent) ?> sent
+            </a>
+          </div>
+          <?php endif; ?>
           <div class="mt-2 d-flex flex-wrap gap-1">
             <?php if ($detailUser['is_admin']): ?><span class="badge bg-dark">Admin</span><?php endif; ?>
             <?php if ($detailUser['is_driver']): ?><span class="badge bg-primary">Driver</span><?php endif; ?>
@@ -1244,35 +1386,86 @@ body { background:#f0f4f8; margin:0; }
   <?php endif; /* detail user exists */ ?>
 
   <?php /* ═══ COMPLAINTS ══════════════════════════════════════════════════ */ elseif ($tab === 'complaints'): ?>
-  <?php if (empty($openComplaints)): ?>
-    <div class="empty-state"><i class="fas fa-flag"></i><p>No open complaints</p></div>
-  <?php else: ?>
-    <?php foreach ($openComplaints as $c): ?>
-    <div class="fd-card mb-3">
-      <div class="d-flex justify-content-between flex-wrap gap-2 mb-2">
-        <div>
-          <span class="status-badge <?= $c['status'] ?>"><?= ucfirst(str_replace('_',' ',$c['status'])) ?></span>
-          <span class="badge bg-secondary ms-1"><?= htmlspecialchars(ucfirst($c['type'])) ?></span>
-        </div>
-        <span class="text-muted small"><?= date('d M Y', strtotime($c['created_at'])) ?></span>
-      </div>
-      <div class="small mb-1">
-        <strong>From:</strong> <?= htmlspecialchars($c['from_name']) ?>
-        <?php if ($c['against_name']): ?>&nbsp;→ <strong>Against:</strong> <?= htmlspecialchars($c['against_name']) ?><?php endif; ?>
-      </div>
-      <?php if ($c['from_location']): ?>
-      <div class="small text-muted mb-1"><i class="fas fa-route me-1"></i><?= htmlspecialchars($c['from_location']) ?> → <?= htmlspecialchars($c['to_location']) ?></div>
-      <?php endif; ?>
-      <p class="small mb-3 text-dark"><?= htmlspecialchars($c['description']) ?></p>
-      <form method="POST" class="d-flex gap-2 flex-wrap align-items-start">
-        <input type="hidden" name="target_id" value="<?= $c['id'] ?>">
-        <textarea name="admin_note" class="form-control form-control-sm" rows="1" placeholder="Admin note (optional)" style="max-width:280px"></textarea>
-        <button name="action" value="resolve_complaint" class="btn-fd-success btn btn-sm"><i class="fas fa-check me-1"></i>Resolve</button>
-        <button name="action" value="dismiss_complaint" class="btn btn-outline-secondary btn-sm">Dismiss</button>
-      </form>
+  <div class="fd-card">
+    <!-- Filter bar -->
+    <form method="GET" class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+      <input type="hidden" name="tab" value="complaints">
+      <select name="complaint_status" class="form-select" style="max-width:180px">
+        <?php foreach ([''=>'All statuses','open'=>'Open','in_review'=>'In Review','resolved'=>'Resolved','dismissed'=>'Dismissed'] as $k=>$v): ?>
+          <option value="<?= $k ?>" <?= $complaintStatusFilter === $k ? 'selected' : '' ?>><?= $v ?></option>
+        <?php endforeach; ?>
+      </select>
+      <button class="btn btn-primary"><i class="fas fa-filter me-1"></i>Apply</button>
+      <a class="btn btn-link" href="?tab=complaints">Reset</a>
+    </form>
+
+    <?php if (empty($allComplaints)): ?>
+      <div class="empty-state"><i class="fas fa-flag"></i><p>No complaints match these filters.</p></div>
+    <?php else: ?>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle small">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>From</th>
+            <th>Against</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th class="text-end">Update</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($allComplaints as $c):
+            $sc = $c['status'];
+            $bg = ['open'=>'#fef9c3','in_review'=>'#e0f2fe','resolved'=>'#dcfce7','dismissed'=>'#f3f4f6'][$sc] ?? '#e5e7eb';
+            $fg = ['open'=>'#854d0e','in_review'=>'#0369a1','resolved'=>'#166534','dismissed'=>'#6b7280'][$sc] ?? '#374151';
+          ?>
+          <tr>
+            <td class="text-muted">#<?= (int)$c['id'] ?></td>
+            <td class="fw-semibold"><?= htmlspecialchars($c['from_name'] ?? '—') ?></td>
+            <td><?= htmlspecialchars($c['against_name'] ?? '—') ?></td>
+            <td>
+              <span class="badge bg-secondary">
+                <?= htmlspecialchars(ucwords(str_replace('_', ' ', $c['type'] ?? ''))) ?>
+              </span>
+            </td>
+            <td style="max-width:320px">
+              <?= htmlspecialchars(mb_strimwidth($c['description'] ?? '', 0, 200, '…')) ?>
+              <?php if (!empty($c['admin_note'])): ?>
+                <div class="text-muted mt-1 fst-italic" style="font-size:.75rem">
+                  <i class="fas fa-comment-alt me-1"></i><?= htmlspecialchars($c['admin_note']) ?>
+                </div>
+              <?php endif; ?>
+            </td>
+            <td>
+              <span class="badge" style="background:<?= $bg ?>;color:<?= $fg ?>">
+                <?= ucfirst(str_replace('_', ' ', $sc)) ?>
+              </span>
+            </td>
+            <td class="text-muted small"><?= date('d M Y', strtotime($c['created_at'])) ?></td>
+            <td class="text-end">
+              <form method="POST" class="d-flex gap-1 align-items-center justify-content-end">
+                <input type="hidden" name="target_id" value="<?= (int)$c['id'] ?>">
+                <select name="action" class="form-select form-select-sm" style="min-width:120px">
+                  <option value="resolve_complaint"  <?= $sc==='resolved'  ? 'selected':'' ?>>Resolved</option>
+                  <option value="dismiss_complaint"  <?= $sc==='dismissed' ? 'selected':'' ?>>Dismissed</option>
+                  <option value="review_complaint"   <?= $sc==='in_review' ? 'selected':'' ?>>In Review</option>
+                </select>
+                <input type="text" name="admin_note" class="form-control form-control-sm"
+                       placeholder="Note (opt)" style="max-width:160px"
+                       value="<?= htmlspecialchars($c['admin_note'] ?? '') ?>">
+                <button class="btn btn-primary btn-sm">Save</button>
+              </form>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
     </div>
-    <?php endforeach; ?>
-  <?php endif; ?>
+    <?php endif; ?>
+  </div>
 
   <?php /* ═══ ORGANIZATIONS ════════════════════════════════════════════════ */ elseif ($tab === 'organizations'): ?>
   <?php if (empty($orgs)): ?>
@@ -1328,34 +1521,112 @@ body { background:#f0f4f8; margin:0; }
     <div class="table-responsive">
       <table class="table table-hover align-middle small">
         <thead class="table-light">
-          <tr><th>#</th><th>User</th><th>Subject</th><th>Assigned Agent</th><th>Status</th><th>Unread</th><th>Reassign</th></tr>
+          <tr>
+            <th>#</th>
+            <th>User</th>
+            <th>Subject</th>
+            <th>Assigned Agent</th>
+            <th>Status</th>
+            <th>Unread</th>
+            <th>Reassign (override)</th>
+            <th></th>
+          </tr>
         </thead>
         <tbody>
-          <?php foreach ($hdConvs as $hc): ?>
+          <?php foreach ($hdConvs as $hc):
+            // Auto-assignment is backend behavior — tickets arrive here already assigned.
+            // agent_id can only be NULL when no AVAILABLE agent existed at creation time.
+            $isUnassigned = empty($hc['agent_id']);
+            $method       = $hc['assignment_method'] ?? null;
+            // Distinguish the three reasons a ticket can be unassigned (spec):
+            //   (a) zero eligible agents exist                 → "No HelpDesk agents exist"
+            //   (b) eligible agents exist but all are busy     → "Waiting for available agent"
+            //   (c) at least one agent is free now             → Retry button will pick it up
+            $unassignedReason = null;
+            if ($isUnassigned) {
+                if (empty($agents))             $unassignedReason = 'no_eligible';
+                elseif (!$anyAgentAvailable)    $unassignedReason = 'all_busy';
+                else                             $unassignedReason = 'retryable';
+            }
+          ?>
           <tr>
             <td class="text-muted">#<?= $hc['id'] ?></td>
             <td class="fw-semibold"><?= htmlspecialchars($hc['user_name']) ?></td>
             <td><?= htmlspecialchars($hc['subject'] ?? 'Support request') ?></td>
-            <td><?= htmlspecialchars($hc['agent_name'] ?? '—') ?></td>
-            <td><span class="status-badge <?= $hc['status'] === 'open' ? 'pending' : 'confirmed' ?>"><?= ucfirst($hc['status']) ?></span></td>
+            <td>
+              <?php if ($isUnassigned): ?>
+                <?php if ($unassignedReason === 'no_eligible'): ?>
+                  <span class="text-danger small" title="Promote a user to HelpDesk Agent from the Users tab">
+                    <i class="fas fa-user-slash me-1"></i>No HelpDesk agents exist
+                  </span>
+                <?php elseif ($unassignedReason === 'all_busy'): ?>
+                  <span class="text-warning small" title="Every agent already has an active ticket — this one will auto-assign as soon as someone resolves theirs">
+                    <i class="fas fa-hourglass-half me-1"></i>Waiting for available agent
+                  </span>
+                <?php else: ?>
+                  <span class="text-muted small" title="An agent is free now — use Retry to assign">
+                    <i class="fas fa-clock me-1"></i>Unassigned
+                  </span>
+                <?php endif; ?>
+              <?php else: ?>
+                <?= htmlspecialchars($hc['agent_name'] ?? '—') ?>
+                <?php if ($method === 'auto'): ?>
+                  <span class="badge bg-info text-dark ms-1" style="font-size:.65rem" title="Auto-assigned by system">Auto</span>
+                <?php elseif ($method === 'manual'): ?>
+                  <span class="badge bg-secondary ms-1" style="font-size:.65rem" title="Manually assigned by admin">Manual</span>
+                <?php endif; ?>
+              <?php endif; ?>
+            </td>
+            <td>
+              <span class="status-badge <?= $hc['status'] === 'open' ? 'pending' : 'confirmed' ?>">
+                <?= ucfirst($hc['status']) ?>
+              </span>
+            </td>
             <td><?= $hc['unread'] > 0 ? "<span class='badge bg-danger'>{$hc['unread']}</span>" : '—' ?></td>
             <td>
               <?php if (!empty($agents)): ?>
-              <form method="POST" class="d-flex gap-1 align-items-center">
-                <input type="hidden" name="action" value="assign_helpdesk">
-                <input type="hidden" name="conv_id" value="<?= $hc['id'] ?>">
-                <select name="target_id" class="form-select form-select-sm" style="min-width:130px">
-                  <?php foreach ($agents as $ag): ?>
-                  <option value="<?= $ag['id'] ?>" <?= $hc['agent_id']==$ag['id']?'selected':'' ?>>
-                    <?= htmlspecialchars($ag['username']) ?>
-                  </option>
-                  <?php endforeach; ?>
-                </select>
-                <button class="btn btn-primary btn-sm">Go</button>
-              </form>
+                <!-- Manual reassignment — admin override only. Default workflow is automatic at creation.
+                     Admin may pick a busy agent on purpose; "(busy)" hint shown next to their name. -->
+                <form method="POST" class="d-flex gap-1 align-items-center"
+                      onsubmit="var s=this.querySelector('select');var o=s.options[s.selectedIndex];if(o.dataset.busy==='1'&&!confirm('That agent already has an active ticket. Assign anyway?'))return false;">
+                  <input type="hidden" name="action"  value="assign_helpdesk">
+                  <input type="hidden" name="conv_id" value="<?= $hc['id'] ?>">
+                  <select name="target_id" class="form-select form-select-sm" style="min-width:150px">
+                    <?php foreach ($agents as $ag):
+                      $busy = ($agentActiveCount[(int)$ag['id']] ?? 0) > 0;
+                    ?>
+                    <option value="<?= $ag['id'] ?>"
+                            data-busy="<?= $busy ? '1' : '0' ?>"
+                            <?= $hc['agent_id'] == $ag['id'] ? 'selected' : '' ?>>
+                      <?= htmlspecialchars($ag['username']) ?><?= $busy ? ' (busy)' : '' ?>
+                    </option>
+                    <?php endforeach; ?>
+                  </select>
+                  <button class="btn btn-secondary btn-sm" title="Manually reassign (admin override)">
+                    <i class="fas fa-user-check"></i>
+                  </button>
+                </form>
               <?php else: ?>
-              <a href="?tab=users" class="text-muted small">Assign agents first</a>
+                <a href="?tab=users" class="text-muted small">No agents — create one first</a>
               <?php endif; ?>
+            </td>
+            <td class="text-end">
+              <?php if ($isUnassigned && $hc['status'] === 'open' && !empty($agents)): ?>
+                <!-- Secondary fallback only — present for tickets the backend couldn't auto-assign
+                     at creation (no available agent then). Clicking when all agents are still busy
+                     surfaces the queued message; clicking when one is free assigns immediately. -->
+                <form method="POST" class="d-inline">
+                  <input type="hidden" name="action"  value="auto_assign_helpdesk">
+                  <input type="hidden" name="conv_id" value="<?= $hc['id'] ?>">
+                  <button class="btn btn-link btn-sm text-muted p-0"
+                          title="<?= $anyAgentAvailable ? 'Retry — an agent is free now' : 'Retry — all agents are currently busy' ?>">
+                    <i class="fas fa-redo me-1"></i>Retry Auto Assignment
+                  </button>
+                </form>
+              <?php endif; ?>
+              <a href="helpdesk.php?conv=<?= $hc['id'] ?>" class="btn btn-sm btn-outline-secondary ms-2" title="Open in HelpDesk console">
+                <i class="fas fa-external-link-alt"></i>
+              </a>
             </td>
           </tr>
           <?php endforeach; ?>

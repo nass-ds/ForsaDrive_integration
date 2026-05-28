@@ -68,6 +68,10 @@ switch ($method . ':' . $action) {
             $pdo->prepare("INSERT INTO driver_profiles (user_id) VALUES (?)")->execute([$userId]);
         }
 
+        // Issue public ForsaDrive ID — same generator used by the web signup.
+        require_once __DIR__ . '/../classes/publicid.php';
+        PublicIdService::ensure($pdo, $userId);
+
         $token = generate_token($userId);
         $stmt  = $pdo->prepare("SELECT * FROM users WHERE id = ?");
         $stmt->execute([$userId]);

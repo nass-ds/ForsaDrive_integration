@@ -328,6 +328,20 @@ include '../include/sidebar.php';
               </form>
               <div class="mt-3 fw-semibold"><?= htmlspecialchars($u['username']) ?></div>
               <div class="text-muted small"><?= htmlspecialchars($u['email']) ?></div>
+              <?php if (!empty($u['public_id'])): ?>
+              <div class="mt-2 d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill"
+                   style="background:#eef2ff;color:#3730a3;font-size:.75rem;font-weight:600;border:1px solid #c7d2fe;"
+                   title="Your public ForsaDrive ID — safe to share">
+                <i class="fas fa-id-badge"></i>
+                <span id="publicIdValue"><?= htmlspecialchars($u['public_id']) ?></span>
+                <button type="button" class="btn btn-link p-0 ms-1" style="line-height:1;color:#3730a3;"
+                        onclick="navigator.clipboard.writeText(document.getElementById('publicIdValue').textContent.trim()); this.querySelector('i').className='fas fa-check'; setTimeout(()=>this.querySelector('i').className='far fa-copy',1500)"
+                        title="Copy ID">
+                  <i class="far fa-copy" style="font-size:.7rem"></i>
+                </button>
+              </div>
+              <div class="text-muted" style="font-size:.7rem">Share this ID to report or get support — your email & phone stay private.</div>
+              <?php endif; ?>
               <?php if (!empty($u['is_driver'])): ?>
               <span class="badge bg-primary mt-1">Driver</span>
               <?php endif; ?>

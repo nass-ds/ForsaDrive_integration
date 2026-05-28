@@ -234,16 +234,29 @@ class Ride {
         }
     }
 
-    /** Mark booking as completed */
+    /** Mark booking as completed (also stamps rides.completed_at — anchors
+     *  the 48-hour full-profile-access window from the identification spec). */
     public function completeBooking(int $bookingId, int $driverId): bool {
         try {
+            $this->pdo->beginTransaction();
             $stmt = $this->pdo->prepare(
                 "UPDATE bookings SET status='completed'
                  WHERE id=? AND status='confirmed'
                    AND ride_id IN (SELECT id FROM rides WHERE driver_id=?)"
             );
-            return $stmt->execute([$bookingId, $driverId]) && $stmt->rowCount() > 0;
+            $ok = $stmt->execute([$bookingId, $driverId]) && $stmt->rowCount() > 0;
+            if ($ok) {
+                // Mark the ride completed_at the first time a booking on that
+                // ride completes; idempotent — won't overwrite an existing stamp.
+                $this->pdo->prepare(
+                    "UPDATE rides SET completed_at = COALESCE(completed_at, datetime('now'))
+                     WHERE id = (SELECT ride_id FROM bookings WHERE id = ?)"
+                )->execute([$bookingId]);
+            }
+            $this->pdo->commit();
+            return $ok;
         } catch (PDOException $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             return false;
         }
     }

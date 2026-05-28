@@ -185,7 +185,8 @@ if ($method === 'POST' && $rideId !== null && $subAction === 'arrive') {
     $user = require_driver();
     $pdo  = db();
     $pdo->beginTransaction();
-    $stmt = $pdo->prepare("UPDATE rides SET status='completed' WHERE id = ? AND driver_id = ?");
+    // completed_at anchors the 48-hour full-profile window (identification spec).
+    $stmt = $pdo->prepare("UPDATE rides SET status='completed', completed_at=datetime('now') WHERE id = ? AND driver_id = ?");
     $stmt->execute([$rideId, $user['id']]);
 
     // Complete all confirmed bookings and credit driver
