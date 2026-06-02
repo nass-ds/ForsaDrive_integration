@@ -295,6 +295,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $promo->setActive($targetId, !empty($_POST['activate']));
             $msg = !empty($_POST['activate']) ? 'Promo code activated.' : 'Promo code deactivated.';
             $msgType = 'success'; $tab = 'promos'; break;
+
+        // ── Admin cancel ride (F-29) ──────────────────────────────────────────
+        case 'cancel_ride':
+            $rideId = (int)($_POST['ride_id'] ?? 0);
+            if ($rideId > 0) {
+                $changed = $db->prepare(
+                    "UPDATE rides SET status='cancelled' WHERE id=? AND status NOT IN ('completed','cancelled')"
+                );
+                $changed->execute([$rideId]);
+                if ($changed->rowCount() > 0) {
+                    // Refund every pending/confirmed booking on this ride
+                    $affected = $db->prepare(
+                        "SELECT id, passenger_id, paid_amount FROM bookings WHERE ride_id=? AND status IN ('pending','confirmed')"
+                    );
+                    $affected->execute([$rideId]);
+                    $refunded = 0;
+                    foreach ($affected->fetchAll(PDO::FETCH_ASSOC) as $bk) {
+                        $db->prepare("UPDATE bookings SET status='cancelled' WHERE id=?")->execute([$bk['id']]);
+                        $amt = (float)$bk['paid_amount'];
+                        if ($amt > 0) {
+                            $db->prepare("UPDATE users SET balance = balance + ? WHERE id=?")->execute([$amt, $bk['passenger_id']]);
+                            $db->prepare("INSERT INTO payments (user_id, amount, type, description) VALUES (?,?,?,?)")
+                               ->execute([$bk['passenger_id'], $amt, 'refund', "Refund: admin cancelled ride #$rideId"]);
+                            $notif->create($bk['passenger_id'], 'Ride Cancelled', "An administrator cancelled your ride. Your payment of " . number_format($amt, 2) . " TND has been refunded.", 'warning');
+                            $refunded++;
+                        }
+                    }
+                    $msg = "Ride #$rideId cancelled. $refunded passenger(s) refunded.";
+                    $msgType = 'success';
+                } else {
+                    $msg = "Ride #$rideId is already completed or cancelled.";
+                    $msgType = 'warning';
+                }
+            } else {
+                $msg = 'Invalid ride ID.'; $msgType = 'danger';
+            }
+            $tab = 'activity'; break;
     }
 
     // Audit trail (§2.4): record every admin mutation with its outcome.
@@ -446,7 +483,7 @@ $anyAgentAvailable = false;
 foreach ($agentActiveCount as $cnt) {
     if ($cnt === 0) { $anyAgentAvailable = true; break; }
 }
-$recentActivity = $db->query("SELECT bk.*, r.from_location, r.to_location, p.username AS passenger, dr.username AS driver FROM bookings bk JOIN rides r ON r.id=bk.ride_id JOIN users p ON p.id=bk.passenger_id JOIN users dr ON dr.id=r.driver_id ORDER BY bk.created_at DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
+$recentActivity = $db->query("SELECT bk.*, r.from_location, r.to_location, r.status AS ride_status, p.username AS passenger, dr.username AS driver FROM bookings bk JOIN rides r ON r.id=bk.ride_id JOIN users p ON p.id=bk.passenger_id JOIN users dr ON dr.id=r.driver_id ORDER BY bk.created_at DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
 
 // ── Complaints (with optional status filter) ─────────────────────────────────
 $complaintStatusFilter = $_GET['complaint_status'] ?? '';
@@ -707,7 +744,7 @@ body { background:#f0f4f8; margin:0; }
     <div class="table-responsive">
       <table class="table table-hover align-middle small mb-0">
         <thead class="table-light">
-          <tr><th>#</th><th>Passenger</th><th>Driver</th><th>Route</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+          <tr><th>#</th><th>Passenger</th><th>Driver</th><th>Route</th><th>Amount</th><th>Status</th><th>Date</th><th></th></tr>
         </thead>
         <tbody>
           <?php foreach ($recentActivity as $b): ?>
@@ -719,6 +756,22 @@ body { background:#f0f4f8; margin:0; }
             <td class="fw-bold"><?= number_format($b['paid_amount'],2) ?> TND</td>
             <td><span class="status-badge <?= $b['status'] ?>"><?= ucfirst($b['status']) ?></span></td>
             <td class="text-muted"><?= date('d M, H:i', strtotime($b['created_at'])) ?></td>
+            <td>
+              <?php /* Show only when THIS booking is still active AND the ride is
+                       cancellable — keeps the button consistent with the row's
+                       Status column (a cancelled/completed booking offers none). */
+              if (in_array($b['status'], ['pending','confirmed'])
+                  && !in_array($b['ride_status'], ['completed','cancelled'])): ?>
+              <form method="POST" onsubmit="return confirm('Cancel ride #<?= $b['ride_id'] ?> and refund all passengers?')">
+                <input type="hidden" name="action"  value="cancel_ride">
+                <input type="hidden" name="ride_id" value="<?= (int)$b['ride_id'] ?>">
+                <input type="hidden" name="target_id" value="0">
+                <button class="btn btn-outline-danger btn-sm" title="Cancel ride & refund passengers">
+                  <i class="fas fa-ban"></i>
+                </button>
+              </form>
+              <?php endif; ?>
+            </td>
           </tr>
           <?php endforeach; ?>
         </tbody>
