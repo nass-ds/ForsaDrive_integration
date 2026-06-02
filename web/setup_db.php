@@ -1,6 +1,12 @@
 <?php
 /**
  * ForsaDrive — Complete Database Reset & Rebuild
+ * ⚠️  DEPRECATED / DANGEROUS — see audit F-09. This script rebuilds a schema
+ *     that DIFFERS from the live shared DB (it adds CHECK constraints the Dart
+ *     API + mobile app violate, e.g. rides.status='active', payments.type=
+ *     'ride_earning', organizations.status='approved'). The authoritative
+ *     schema lives in ForsaDrive_PFE/forsa_drive_api/lib/db.dart. It now
+ *     refuses to run against the shared DB unless explicitly forced.
  * ⚠️  THIS DROPS ALL EXISTING DATA — run only to start fresh.
  * Web:  http://localhost/ForsaDrive/setup_db.php?confirm=yes
  * CLI:  php setup_db.php --confirm
@@ -30,6 +36,30 @@ if (!$cliConfirm && !$webConfirm) { ?>
 </div>
 </body></html>
 <?php exit(); }
+
+// ── GUARD (audit F-09) ──────────────────────────────────────────────────────
+// This script DROPs every table and rebuilds an INCOMPATIBLE schema. The shared
+// SQLite file is owned by the Dart API + mobile app; running this against it
+// destroys the live data both stacks rely on. Refuse unless explicitly forced.
+$forceShared = (PHP_SAPI === 'cli' && in_array('--force-shared', $argv ?? [], true))
+            || (isset($_GET['force']) && $_GET['force'] === 'shared');
+$sharedDb = __DIR__ . '/../ForsaDrive_PFE/forsa_drive_api/database/DB.db';
+if (!$forceShared && file_exists($sharedDb)) {
+    $isCli = (PHP_SAPI === 'cli');
+    $msg = "REFUSED: the shared Dart/mobile database exists at\n  $sharedDb\n"
+         . "setup_db.php would DROP it and rebuild an incompatible schema.\n"
+         . "Stop the Dart API and let web/classes/database.php::autoMigrate() add\n"
+         . "the web columns on the next connection instead.\n"
+         . "To override anyway (DESTRUCTIVE), re-run with "
+         . ($isCli ? "--force-shared\n" : "?confirm=yes&force=shared\n");
+    if ($isCli) { fwrite(STDERR, $msg); exit(1); }
+    http_response_code(409);
+    echo '<pre style="font-family:Consolas,monospace;background:#fff3cd;border:1px solid #f59e0b;'
+       . 'padding:1rem;border-radius:8px;max-width:660px;margin:2rem auto;white-space:pre-wrap;">'
+       . htmlspecialchars($msg) . '</pre>';
+    exit();
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/classes/database.php';

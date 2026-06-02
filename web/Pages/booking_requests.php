@@ -256,7 +256,7 @@ require_once '../include/sidebar.php';
                         <!-- Details -->
                         <div class="d-flex gap-3 small text-muted">
                             <span><i class="fas fa-users me-1 text-primary"></i><?= (int)$bk['seats'] ?> seat<?= $bk['seats'] > 1 ? 's' : '' ?></span>
-                            <span><i class="fas fa-money-bill-wave me-1 text-success"></i><?= number_format((float)($bk['paid_amount'] ?? 0), 2) ?> DZD</span>
+                            <span><i class="fas fa-money-bill-wave me-1 text-success"></i><?= number_format((float)($bk['paid_amount'] ?? 0), 2) ?> TND</span>
                             <span class="ms-auto text-muted"><?= htmlspecialchars(substr($bk['created_at'] ?? '', 0, 10)) ?></span>
                         </div>
 
@@ -333,7 +333,7 @@ require_once '../include/sidebar.php';
                         <!-- Details -->
                         <div class="d-flex gap-3 small text-muted">
                             <span><i class="fas fa-users me-1 text-primary"></i><?= (int)$bk['seats'] ?> seat<?= $bk['seats'] > 1 ? 's' : '' ?></span>
-                            <span><i class="fas fa-money-bill-wave me-1 text-success"></i><?= number_format((float)($bk['paid_amount'] ?? 0), 2) ?> DZD</span>
+                            <span><i class="fas fa-money-bill-wave me-1 text-success"></i><?= number_format((float)($bk['paid_amount'] ?? 0), 2) ?> TND</span>
                         </div>
 
                         <!-- Mark Complete button -->
