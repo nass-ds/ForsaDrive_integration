@@ -17,7 +17,7 @@ if ($method === 'POST' && $action === 'validate-promo') {
     $stmt = db()->prepare("
         SELECT id, name, discount_percent
         FROM organizations
-        WHERE UPPER(discount_code) = ? AND status = 'active'
+        WHERE UPPER(discount_code) = ? AND status IN ('active','approved')
     ");
     $stmt->execute([$code]);
     $org = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -66,15 +66,17 @@ if ($method === 'POST' && $action === '') {
 
     // Optional organizational promo code (applied AFTER the student discount)
     $promoCode = isset($b['promo_code']) ? strtoupper(trim($b['promo_code'])) : '';
+    $appliedPromo = null; // stored on the booking only if it actually applied
     if ($promoCode !== '') {
         $orgStmt = $pdo->prepare("
             SELECT discount_percent FROM organizations
-            WHERE UPPER(discount_code) = ? AND status = 'active'
+            WHERE UPPER(discount_code) = ? AND status IN ('active','approved')
         ");
         $orgStmt->execute([$promoCode]);
         $promoPct = (int)($orgStmt->fetchColumn() ?: 0);
         if ($promoPct > 0) {
             $price *= max(0.0, 1 - $promoPct / 100);
+            $appliedPromo = $promoCode;
         }
     }
 
@@ -82,8 +84,8 @@ if ($method === 'POST' && $action === '') {
     if ($uBalance < $price) { $pdo->rollBack(); json_error('Insufficient balance', 402); }
 
     $pdo->prepare("UPDATE users SET balance = balance - ? WHERE id = ?")->execute([$price, $user['id']]);
-    $pdo->prepare("INSERT INTO bookings (ride_id, passenger_id, seats, paid_amount, status) VALUES (?, ?, ?, ?, 'pending')")
-        ->execute([$rideId, $user['id'], $seats, $price]);
+    $pdo->prepare("INSERT INTO bookings (ride_id, passenger_id, seats, paid_amount, status, discount_code) VALUES (?, ?, ?, ?, 'pending', ?)")
+        ->execute([$rideId, $user['id'], $seats, $price, $appliedPromo]);
     $bookingId2 = (int)$pdo->lastInsertId();
 
     // Payment record

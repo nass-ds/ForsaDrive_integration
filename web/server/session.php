@@ -42,6 +42,37 @@ function isAdmin(): bool {
     return isLoggedIn() && !empty($_SESSION['user_data']['is_admin']);
 }
 
+// Organization session functions
+function isOrgLoggedIn(): bool {
+    return isset($_SESSION['org_id']);
+}
+
+function getCurrentOrg(): ?array {
+    if (!isset($_SESSION['org_id'])) return null;
+
+    $pdo = getDB();
+    $stmt = $pdo->prepare("SELECT * FROM organizations WHERE id = ?");
+    $stmt->execute([$_SESSION['org_id']]);
+    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+function loginOrg(array $org): void {
+    $_SESSION['org_id'] = $org['id'];
+    $_SESSION['org_data'] = $org;
+}
+
+function logoutOrg(): void {
+    unset($_SESSION['org_id']);
+    unset($_SESSION['org_data']);
+}
+
+function requireOrgLogin(string $redirect = '../Pages/org_login.php'): void {
+    if (!isOrgLoggedIn()) {
+        header("Location: $redirect");
+        exit();
+    }
+}
+
 // Use at the top of every normal user page.
 // Admins are always redirected to admin.php — they must use a separate account for regular features.
 function requireRegularUser(string $loginRedirect = 'login.php', string $adminRedirect = 'admin.php'): void {
