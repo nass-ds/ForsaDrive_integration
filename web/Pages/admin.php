@@ -7,6 +7,7 @@ require_once '../classes/sanctions.php';
 require_once '../classes/audit_log.php';
 require_once '../classes/announcements.php';
 require_once '../classes/promo_codes.php';
+require_once '../classes/reports.php';
 if (!isLoggedIn() || empty($_SESSION['user_data']['is_admin'])) {
     header('Location: interface.php'); exit();
 }
@@ -148,13 +149,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg = 'Complaint marked In Review.'; $msgType = 'success'; $tab = 'complaints'; break;
 
         case 'approve_org':
-            $code = strtoupper(substr(md5(uniqid()), 0, 8));
-            $db->prepare("UPDATE organizations SET status='active', discount_code=? WHERE id=?")->execute([$code, $targetId]);
-            $msg = "Organization approved. Discount code: <strong>$code</strong>"; $msgType = 'success'; $tab = 'organizations'; break;
+            $orgStmt = $db->prepare("SELECT * FROM organizations WHERE id=?");
+            $orgStmt->execute([$targetId]);
+            $org = $orgStmt->fetch(PDO::FETCH_ASSOC);
+            if ($org) {
+                // Generate discount code (same format as in API)
+                $orgName = preg_replace('/[^A-Z0-9]/i', '', strtoupper($org['name']));
+                $prefix = substr($orgName, 0, 4);
+                $suffix = (1000 + random_int(0, 8999));
+                $code = $prefix . $suffix;
+
+                // Generate random password
+                $password = bin2hex(random_bytes(8));
+                $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+
+                // Update organization
+                $db->prepare("UPDATE organizations SET status=?, discount_code=?, password=? WHERE id=?")
+                    ->execute(['approved', $code, $hashedPassword, $targetId]);
+
+                // Send email with credentials
+                $contactEmail = $org['contact_email'];
+                $orgName = htmlspecialchars($org['name']);
+                $subject = "ForsaDrive Organization Approval — Your Login Credentials";
+                $body = <<<HTML
+<html>
+<body style="font-family: Arial, sans-serif; color: #333;">
+    <h2 style="color: #FFA500;">Organization Application Approved! 🎉</h2>
+    <p>Dear $orgName,</p>
+    <p>Your organization application has been <strong>approved</strong> on ForsaDrive!</p>
+
+    <h3>Your Discount Code</h3>
+    <p style="font-size: 24px; font-weight: bold; color: #FFA500; letter-spacing: 2px;">$code</p>
+    <p>Share this code with your members. They'll receive <strong>{$org['discount_percent']}% off</strong> every ride.</p>
+
+    <h3>Organization Dashboard Login</h3>
+    <p>Login to manage your organization, members, and view usage statistics:</p>
+    <ul>
+        <li><strong>URL:</strong> <a href="http://localhost/ForsaDrive/Pages/org_login.php">Organization Login</a></li>
+        <li><strong>Email:</strong> {$org['contact_email']}</li>
+        <li><strong>Password:</strong> $password</li>
+    </ul>
+
+    <p style="color: #666; font-size: 12px;">⚠️ <strong>For security:</strong> Change your password after your first login.</p>
+
+    <p>Questions? Contact us at support@forsadrive.tn</p>
+    <p>Best regards,<br>ForsaDrive Admin Team</p>
+</body>
+</html>
+HTML;
+
+                // Send email (using PHP mail as a fallback; adjust if using SMTP)
+                $headers = "MIME-Version: 1.0\r\n";
+                $headers .= "Content-type: text/html; charset=UTF-8\r\n";
+                $headers .= "From: noreply@forsadrive.tn\r\n";
+                @mail($contactEmail, $subject, $body, $headers);
+
+                $msg = "Organization approved. Discount code: <strong>$code</strong><br>Login credentials sent to <strong>$contactEmail</strong>";
+                $msgType = 'success';
+                $tab = 'organizations';
+            } else {
+                $msg = 'Organization not found.';
+                $msgType = 'danger';
+            }
+            break;
 
         case 'reject_org':
-            $db->prepare("UPDATE organizations SET status='suspended' WHERE id=?")->execute([$targetId]);
-            $msg = 'Organization rejected.'; $msgType = 'danger'; $tab = 'organizations'; break;
+            $reason = trim($_POST['rejection_reason'] ?? 'Application did not meet our requirements.');
+            $db->prepare("UPDATE organizations SET status='rejected', rejection_reason=? WHERE id=?")->execute([$reason, $targetId]);
+
+            // Notify org via email
+            $orgStmt = $db->prepare("SELECT * FROM organizations WHERE id=?");
+            $orgStmt->execute([$targetId]);
+            $org = $orgStmt->fetch(PDO::FETCH_ASSOC);
+            if ($org) {
+                $subject = "ForsaDrive Organization Application — Decision";
+                $body = <<<HTML
+<html>
+<body style="font-family: Arial, sans-serif; color: #333;">
+    <h2>Application Update</h2>
+    <p>Dear {$org['contact_name']},</p>
+    <p>Thank you for applying to ForsaDrive organization program. Unfortunately, your application for <strong>{$org['name']}</strong> was not approved at this time.</p>
+    <p><strong>Reason:</strong> $reason</p>
+    <p>You may reapply after addressing any concerns. Please contact support@forsadrive.tn if you have questions.</p>
+    <p>Best regards,<br>ForsaDrive Admin Team</p>
+</body>
+</html>
+HTML;
+                $headers = "MIME-Version: 1.0\r\n";
+                $headers .= "Content-type: text/html; charset=UTF-8\r\n";
+                $headers .= "From: noreply@forsadrive.tn\r\n";
+                @mail($org['contact_email'], $subject, $body, $headers);
+            }
+
+            $msg = 'Organization rejected.';
+            $msgType = 'danger';
+            $tab = 'organizations';
+            break;
 
         case 'assign_helpdesk':
             // Manual override — admin explicitly chose the agent (may be busy).

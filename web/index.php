@@ -36,16 +36,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['org_apply'])) {
     if (!$orgErr) {
         try {
             $pdo = getDB();
+            $userId = $loggedIn ? $_SESSION['user_id'] : null;
+            // Populate both the canonical columns the Dart API reads
+            // (contact_person, staff_email_domain) and the legacy columns the
+            // web admin displays (contact_name, email_domain).
             $pdo->prepare("
                 INSERT INTO organizations
-                    (name, type, contact_name, contact_email, phone,
-                     email_domain, discount_percent, address, notes, status)
-                VALUES (?,?,?,?,?,?,?,?,?,'pending')
-            ")->execute([$orgName, $orgType, $contactName, $contactEmail,
-                         $contactPhone, $emailDomain, $discountReq, $address, $notes]);
+                    (user_id, name, type, contact_person, contact_name,
+                     contact_email, phone, staff_email_domain, email_domain,
+                     discount_percent, address, notes, status)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ")->execute([$userId, $orgName, $orgType, $contactName, $contactName,
+                         $contactEmail, $contactPhone, $emailDomain, $emailDomain,
+                         $discountReq, $address, $notes, 'pending']);
             $orgMsg = "Application submitted! We'll review it within 2–3 business days and send your discount code to " . htmlspecialchars($contactEmail) . ".";
         } catch (Exception $e) {
-            $orgErr = 'Could not submit application. Please try again later.';
+            $orgErr = 'Database error: ' . htmlspecialchars($e->getMessage());
         }
     }
 }
@@ -105,6 +111,9 @@ if (isset($_GET['logout'])) {
                     <i class="fas fa-sign-out-alt me-1"></i>Logout
                 </a>
             <?php else: ?>
+                <a href="Pages/org_login.php" class="btn-nav-login" title="Organization Login">
+                    <i class="fas fa-building me-1"></i>Org Login
+                </a>
                 <a href="Pages/login.php" class="btn-nav-login">Login</a>
                 <a href="Pages/signup.php" class="btn-nav-signup">Sign Up Free</a>
             <?php endif; ?>
